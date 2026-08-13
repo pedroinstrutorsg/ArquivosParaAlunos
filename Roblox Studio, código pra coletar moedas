@@ -1,0 +1,41 @@
+-- Variável que vai guardar a quantidade de dinheiro do jogador (começa em 0)
+local dinheiro = 0
+
+-- Função que vai rodar toda vez que algo tocar em uma Moeda
+-- "moedaTocada" é a moeda específica que foi tocada
+-- "part" é a parte (Part) que encostou na moeda (pode ser um braço, perna, etc)
+local function BlocoTocado(moedaTocada, part)
+
+	-- part.Parent pega o "pai" da parte que tocou (geralmente é o personagem do jogador)
+	-- FindFirstChild("Humanoid") procura se esse modelo tem um objeto Humanoid dentro
+	-- Se tiver Humanoid, significa que quem tocou foi um personagem (jogador ou NPC), não um objeto qualquer
+	local Player = part.Parent:FindFirstChild("Humanoid")
+
+	-- Se encontrou o Humanoid (ou seja, se quem tocou é um personagem)
+	if Player then
+
+		-- Aumenta o dinheiro em 1
+		dinheiro = dinheiro + 1
+
+		-- Destrói a moeda específica que foi tocada (não todas, só essa)
+		moedaTocada:Destroy()
+
+		-- Mostra no console/output quanto dinheiro o jogador tem agora
+		print("Dinheiro: "..dinheiro)
+	end
+end
+
+-- GetDescendants() pega todos os objetos dentro do Workspace, incluindo os que estão dentro de pastas
+for _, objeto in pairs(game.Workspace:GetDescendants()) do
+
+	-- Verifica se o nome do objeto é exatamente "Moeda"
+	if objeto.Name == "Moeda" then
+
+		-- Conecta o evento Touched dessa moeda específica à função BlocoTocado
+		-- Usamos uma função anônima aqui pra conseguir passar "objeto" (a moeda) como argumento,
+		-- já que o evento Touched só entrega "part" automaticamente
+		objeto.Touched:Connect(function(part)
+			BlocoTocado(objeto, part)
+		end)
+	end
+end
