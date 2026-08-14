@@ -1,42 +1,50 @@
 using UnityEngine;
+using UnityEngine.SceneManagement; // Necess√°rio para poder recarregar a cena
 
 public class PlataformaMovel : MonoBehaviour
 {
-    [Tooltip("ConfiguraÁıes de Movimento")] // Nos permite escolher o texto que aparece no inspetor
-    public Vector3 eixoMovimento = Vector3.right; // Vari·vel especial da Unity que guarda a posiÁ„o do objeto
-
+    [Tooltip("Configura√ß√µes de Movimento")] // Nos permite escolher o texto que aparece no inspetor
+    public Vector3 eixoMovimento = Vector3.right; // Vari√°vel especial da Unity que guarda a posi√ß√£o do objeto
     [Tooltip("Velocidade de deslocamento")]
-    public float velocidade = 2f; // Vari·vel de velocidade com valor padr„o 2
+    public float velocidade = 2f; // Vari√°vel de velocidade com valor padr√£o 2
+    [Tooltip("Se ativa, a plataforma reinicia a cena ao tocar o Player")]
+    public bool dano = false; // Vari√°vel que define se a plataforma causa dano (reinicia a cena) ao encostar no player
+    private int sentido = 1; // Vari√°vel que determina se a plataforma segue a dire√ß√£o determinada ou o seu oposto
+    private bool playerNaPlataforma = false; // Vari√°vel que verifica se o player est√° encostando na plataforma
 
-    private int sentido = 1; // Vari·vel que determina se a plataforma segue a direÁ„o determinada ou o seu oposto
-    private bool playerNaPlataforma = false; // Vari·vel que verifica se o player est· encostando na plataforma
-
-    void Update() // FunÁ„o chamada o tempo todo
+    void Update() // Fun√ß√£o chamada o tempo todo
     {
-        transform.Translate(eixoMovimento.normalized * sentido * velocidade * Time.deltaTime, Space.World); // CÛdigo que movimenta a plataforma
+        transform.Translate(eixoMovimento.normalized * sentido * velocidade * Time.deltaTime, Space.World); // C√≥digo que movimenta a plataforma
     }
 
-    void OnTriggerEnter(Collider other) //FunÁ„o (OnTriggerEnter) sÛ acionada quando um objeto colide no outro
+    void OnTriggerEnter(Collider other) //Fun√ß√£o (OnTriggerEnter) s√≥ acionada quando um objeto colide no outro
     {
-        if (other.CompareTag("Limite")) // Verifica se a tag do objeto È exatamente "Limite"
+        if (other.CompareTag("Limite")) // Verifica se a tag do objeto √© exatamente "Limite"
         {
-            sentido *= -1; // No caso do plataforma de fato encostar no "Limite o seu sentido È invertido, isso vale para ambos os casos
+            sentido *= -1; // No caso do plataforma de fato encostar no "Limite o seu sentido √© invertido, isso vale para ambos os casos
         }
     }
 
     void OnCollisionStay(Collision collision)
     {
-        if (collision.gameObject.CompareTag("Player")) // Quando a plataforma toca algum objeto ele chama essa funÁ„o que verifica se a tag È exatamente "Player"
+        if (collision.gameObject.CompareTag("Player")) // Quando a plataforma toca algum objeto ele chama essa fun√ß√£o que verifica se a tag √© exatamente "Player"
         {
-            if (!playerNaPlataforma) // Verifica se a vari·vel playerNaPlataforma È falsa, caso seja ele executa o cÛdigo abaixo
+            // Se a plataforma causa dano, reinicia a cena assim que encosta no player
+            if (dano)
             {
-                playerNaPlataforma = true; // transforma a vari·vel em verdadeira
-                collision.transform.SetParent(transform); // Transforma o objeto Player em um "filho" do obejto plataforma fazendo com que ele sofra toda a forÁa que È exercidad nele
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                return; // Encerra a fun√ß√£o aqui, j√° que a cena vai reiniciar
+            }
+
+            if (!playerNaPlataforma) // Verifica se a vari√°vel playerNaPlataforma √© falsa, caso seja ele executa o c√≥digo abaixo
+            {
+                playerNaPlataforma = true; // transforma a vari√°vel em verdadeira
+                collision.transform.SetParent(transform); // Transforma o objeto Player em um "filho" do obejto plataforma fazendo com que ele sofra toda a for√ßa que √© exercidad nele
             }
         }
     }
 
-    void OnCollisionExit(Collision collision) // FunÁ„o (OnCollisionExit) È chamada quando um objeto deixa de encostar na plataforma
+    void OnCollisionExit(Collision collision) // Fun√ß√£o (OnCollisionExit) √© chamada quando um objeto deixa de encostar na plataforma
     {
         if (collision.gameObject.CompareTag("Player"))
         {
