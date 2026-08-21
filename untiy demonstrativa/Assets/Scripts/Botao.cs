@@ -1,0 +1,23 @@
+using UnityEngine;
+using UnityEngine.SceneManagement; // Necessário para poder carregar outras cenas (LoadScene)
+
+public class Botao : MonoBehaviour
+{
+    // Método chamado pelo evento OnClick() do componente Button no Inspector
+    public void IrParaJogo()
+    {
+        // Carrega a cena "Jogo" (ela precisa estar adicionada em File > Build Settings > Scenes In Build)
+        SceneManager.LoadScene("Jogo");
+    }
+
+    // Chamado automaticamente pela Unity assim que este script é carregado em uma cena
+    // Como o botão fica na cena "Jogo", esse método já roda logo que ela inicia
+    void Awake()
+    {
+        // Destrava o cursor do mouse, permitindo que ele se mova livremente pela tela
+        Cursor.lockState = CursorLockMode.None;
+
+        // Torna o cursor visível novamente na tela
+        Cursor.visible = true;
+    }
+}
