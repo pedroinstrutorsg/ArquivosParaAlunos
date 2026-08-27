@@ -1,0 +1,48 @@
+-- ========================================
+-- MODULE SCRIPT: ECONOMIA
+-- Guarda as variáveis compartilhadas entre
+-- o Gerador e o Coletor
+-- ========================================
+
+local Economia = {} -- tabela que vai guardar tudo que os outros scripts podem usar
+
+-- quantidade de dinheiro esperando ser coletado
+Economia.armazem = 0
+
+-- tabela que guarda a carteira de CADA jogador
+-- formato: carteiras[UserId] = valor
+Economia.carteiras = {}
+
+-- ========================================
+-- FUNÇÃO: adiciona dinheiro ao armazém
+-- (chamada pelo GeradorScript)
+-- ========================================
+function Economia.adicionarAoArmazem(valor)
+    Economia.armazem = Economia.armazem + valor
+end
+
+-- ========================================
+-- FUNÇÃO: transfere o dinheiro do armazém
+-- para a carteira do jogador que coletou
+-- (chamada pelo ColetorScript)
+-- ========================================
+function Economia.coletarParaJogador(jogador)
+    local valor = Economia.armazem -- pega tudo que está guardado
+
+    if valor > 0 then -- só faz algo se tiver dinheiro pra coletar
+        local id = jogador.UserId -- identifica o jogador de forma única
+
+        -- se o jogador ainda não tem carteira, começa em 0
+        -- se já tem, soma o novo valor
+        Economia.carteiras[id] = (Economia.carteiras[id] or 0) + valor
+
+        Economia.armazem = 0 -- esvazia o armazém depois de coletar
+    end
+
+    -- retorna o total atualizado da carteira desse jogador
+    return Economia.carteiras[jogador.UserId] or 0
+end
+
+-- toda ModuleScript PRECISA retornar algo no final
+-- é isso que o require() vai receber
+return Economia
