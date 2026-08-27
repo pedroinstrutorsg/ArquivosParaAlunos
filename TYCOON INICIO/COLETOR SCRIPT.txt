@@ -1,48 +1,29 @@
 -- ========================================
--- MODULE SCRIPT: ECONOMIA
--- Guarda as variáveis compartilhadas entre
--- o Gerador e o Coletor
+-- SCRIPT: COLETOR
+-- Detecta quando um jogador toca no objeto
+-- e transfere o dinheiro do armazém pra carteira dele
 -- ========================================
 
-local Economia = {} -- tabela que vai guardar tudo que os outros scripts podem usar
+-- pega o módulo Economia (mesma instância usada pelo Gerador)
+local Economia = require(workspace.Economia)
 
--- quantidade de dinheiro esperando ser coletado
-Economia.armazem = 0
-
--- tabela que guarda a carteira de CADA jogador
--- formato: carteiras[UserId] = valor
-Economia.carteiras = {}
+-- a própria forma (Sphere) onde esse script está dentro
+local parte = script.Parent
 
 -- ========================================
--- FUNÇÃO: adiciona dinheiro ao armazém
--- (chamada pelo GeradorScript)
+-- EVENTO: dispara toda vez que algo toca na parte
 -- ========================================
-function Economia.adicionarAoArmazem(valor)
-    Economia.armazem = Economia.armazem + valor
-end
+parte.Touched:Connect(function(hit)
+    -- "hit" é a parte específica que tocou (ex: perna do boneco)
+    -- hit.Parent pega o modelo do personagem inteiro
 
--- ========================================
--- FUNÇÃO: transfere o dinheiro do armazém
--- para a carteira do jogador que coletou
--- (chamada pelo ColetorScript)
--- ========================================
-function Economia.coletarParaJogador(jogador)
-    local valor = Economia.armazem -- pega tudo que está guardado
+    local jogador = game.Players:GetPlayerFromCharacter(hit.Parent)
+    -- converte o personagem no objeto Player de verdade
+    -- se não for um jogador (ex: um NPC), retorna nil
 
-    if valor > 0 then -- só faz algo se tiver dinheiro pra coletar
-        local id = jogador.UserId -- identifica o jogador de forma única
+    if jogador then -- só continua se quem tocou for realmente um jogador
+        local total = Economia.coletarParaJogador(jogador)
 
-        -- se o jogador ainda não tem carteira, começa em 0
-        -- se já tem, soma o novo valor
-        Economia.carteiras[id] = (Economia.carteiras[id] or 0) + valor
-
-        Economia.armazem = 0 -- esvazia o armazém depois de coletar
+        print(jogador.Name .. " coletou o dinheiro! Carteira agora: " .. total)
     end
-
-    -- retorna o total atualizado da carteira desse jogador
-    return Economia.carteiras[jogador.UserId] or 0
-end
-
--- toda ModuleScript PRECISA retornar algo no final
--- é isso que o require() vai receber
-return Economia
+end)
