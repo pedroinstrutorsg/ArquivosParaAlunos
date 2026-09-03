@@ -1,0 +1,71 @@
+-- ========================================
+-- SCRIPT: Botao (fica DENTRO da peça Botao)
+-- Local: Workspace.Tycoon.Botao1.Botao
+-- ========================================
+
+-- pega o módulo de economia que guarda dinheiro e carteiras
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- a própria peça que o script está dentro (o botão)
+local botao = script.Parent
+
+-- a pasta "Botao1" que contém o botão e os itens
+local pasta = botao.Parent
+
+-- ========================================
+-- VARIÁVEL DO PREÇO
+-- definida direto aqui no script (não em Attribute)
+-- ao duplicar o botão, essa é a única linha que muda
+-- ========================================
+local preco = 100
+
+-- variável de controle: impede comprar 2x ao mesmo tempo
+local jaComprado = false
+
+-- ========================================
+-- FUNÇÃO: libera os itens (deixa visíveis e sólidos)
+-- ========================================
+local function liberarItens()
+	for _, objeto in ipairs(pasta:GetChildren()) do
+		-- pula o próprio botão, só mexe nos outros objetos da pasta
+		if objeto ~= botao and objeto:IsA("BasePart") then
+			objeto.Transparency = 0
+			objeto.CanCollide = true
+		end
+	end
+end
+
+-- ========================================
+-- EVENTO: quando algo toca no botão
+-- ========================================
+botao.Touched:Connect(function(hit)
+	if jaComprado then return end -- já foi comprado, ignora
+
+	-- descobre se quem tocou é um jogador (e não um objeto qualquer)
+	local personagem = hit.Parent
+	local jogador = game.Players:GetPlayerFromCharacter(personagem)
+	if not jogador then return end -- não é um jogador, ignora
+
+	-- confere quanto dinheiro o jogador tem na carteira
+	local carteira = Economia.carteiras[jogador.UserId] or 0
+
+	if carteira >= preco then
+		jaComprado = true -- trava a compra imediatamente (evita duplicidade)
+
+		-- desconta o preço da carteira do jogador
+		Economia.carteiras[jogador.UserId] = carteira - preco
+
+		-- revela os itens que essa compra desbloqueia
+		liberarItens()
+
+		-- o próprio botão some, igual os itens começavam
+		botao.Transparency = 1
+		botao.CanCollide = false
+		botao.CanTouch = false -- garante que Touched não dispare de novo
+
+		print(jogador.Name .. " comprou por " .. preco)
+	else
+		print(jogador.Name .. " não tem dinheiro suficiente")
+	end
+end)
