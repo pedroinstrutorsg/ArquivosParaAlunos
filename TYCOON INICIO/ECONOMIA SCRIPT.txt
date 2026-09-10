@@ -18,7 +18,7 @@ Economia.carteiras = {}
 -- (chamada pelo GeradorScript)
 -- ========================================
 function Economia.adicionarAoArmazem(valor)
-    Economia.armazem = Economia.armazem + valor
+	Economia.armazem = Economia.armazem + valor
 end
 
 -- ========================================
@@ -27,20 +27,20 @@ end
 -- (chamada pelo ColetorScript)
 -- ========================================
 function Economia.coletarParaJogador(jogador)
-    local valor = Economia.armazem -- pega tudo que está guardado
+	local valor = Economia.armazem -- pega tudo que está guardado
 
-    if valor > 0 then -- só faz algo se tiver dinheiro pra coletar
-        local id = jogador.UserId -- identifica o jogador de forma única
+	if valor > 0 then -- só faz algo se tiver dinheiro pra coletar
+		local id = jogador.UserId -- identifica o jogador de forma única
 
-        -- se o jogador ainda não tem carteira, começa em 0
-        -- se já tem, soma o novo valor
-        Economia.carteiras[id] = (Economia.carteiras[id] or 0) + valor
+		-- se o jogador ainda não tem carteira, começa em 0
+		-- se já tem, soma o novo valor
+		Economia.carteiras[id] = (Economia.carteiras[id] or 0) + valor
 
-        Economia.armazem = 0 -- esvazia o armazém depois de coletar
-    end
+		Economia.armazem = 0 -- esvazia o armazém depois de coletar
+	end
 
-    -- retorna o total atualizado da carteira desse jogador
-    return Economia.carteiras[jogador.UserId] or 0
+	-- retorna o total atualizado da carteira desse jogador
+	return Economia.carteiras[jogador.UserId] or 0
 end
 
 -- toda ModuleScript PRECISA retornar algo no final
