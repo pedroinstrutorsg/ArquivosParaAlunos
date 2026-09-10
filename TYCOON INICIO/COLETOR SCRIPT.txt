@@ -5,7 +5,8 @@
 -- ========================================
 
 -- pega o módulo Economia (mesma instância usada pelo Gerador)
-local Economia = require(workspace.Economia)
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
 
 -- a própria forma (Sphere) onde esse script está dentro
 local parte = script.Parent
@@ -14,16 +15,16 @@ local parte = script.Parent
 -- EVENTO: dispara toda vez que algo toca na parte
 -- ========================================
 parte.Touched:Connect(function(hit)
-    -- "hit" é a parte específica que tocou (ex: perna do boneco)
-    -- hit.Parent pega o modelo do personagem inteiro
+	-- "hit" é a parte específica que tocou (ex: perna do boneco)
+	-- hit.Parent pega o modelo do personagem inteiro
 
-    local jogador = game.Players:GetPlayerFromCharacter(hit.Parent)
-    -- converte o personagem no objeto Player de verdade
-    -- se não for um jogador (ex: um NPC), retorna nil
+	local jogador = game.Players:GetPlayerFromCharacter(hit.Parent)
+	-- converte o personagem no objeto Player de verdade
+	-- se não for um jogador (ex: um NPC), retorna nil
 
-    if jogador then -- só continua se quem tocou for realmente um jogador
-        local total = Economia.coletarParaJogador(jogador)
+	if jogador then -- só continua se quem tocou for realmente um jogador
+		local total = Economia.coletarParaJogador(jogador)
 
-        print(jogador.Name .. " coletou o dinheiro! Carteira agora: " .. total)
-    end
+		print(jogador.Name .. " coletou o dinheiro! Carteira agora: " .. total)
+	end
 end)
