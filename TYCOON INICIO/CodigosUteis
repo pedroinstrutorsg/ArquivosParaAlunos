@@ -1,0 +1,2 @@
+print(game.Selection:Get()[1]:GetFullName())
+// comando para descobrir exatamente o caminho do item selecionado
