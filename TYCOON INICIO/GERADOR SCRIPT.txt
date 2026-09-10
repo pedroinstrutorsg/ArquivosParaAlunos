@@ -5,7 +5,8 @@
 -- ========================================
 
 -- pega o módulo Economia para usar suas funções e variáveis
-local Economia = require(workspace.Economia)
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
 
 -- ========================================
 -- CONFIGURAÇÕES DO GERADOR
@@ -17,10 +18,10 @@ local dinheiroPorCiclo = 10 -- quanto dinheiro é gerado por vez
 -- LOOP INFINITO: roda pra sempre enquanto o jogo estiver ativo
 -- ========================================
 while true do
-    task.wait(intervaloGeracao) -- "pausa" o script por X segundos antes de continuar
+	task.wait(intervaloGeracao) -- "pausa" o script por X segundos antes de continuar
 
-    Economia.adicionarAoArmazem(dinheiroPorCiclo) -- chama a função do módulo
+	Economia.adicionarAoArmazem(dinheiroPorCiclo) -- chama a função do módulo
 
-    -- toda vez que o ciclo se repete, mostra quanto tem guardado
-    print("Novo ciclo! Dinheiro guardado no armazém: " .. Economia.armazem)
+	-- toda vez que o ciclo se repete, mostra quanto tem guardado
+	print("Novo ciclo! Dinheiro guardado no armazém: " .. Economia.armazem)
 end
