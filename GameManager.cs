@@ -1,0 +1,57 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public class GameManager : MonoBehaviour
+{
+    // Se estiver marcada como true, os objetos com a tag "Limite" terão o MeshRenderer desativado
+    public bool esconderLimites = true;
+
+    // Referência ao jogador, para pegar a posição dele
+    public Transform jogador;
+
+    // Posição Y mínima permitida antes de reiniciar a cena
+    public float limiteY = -10f;
+
+    void Start()
+    {
+        // Só executa a função se a variável estiver ativa
+        if (esconderLimites)
+        {
+            EscondeLimite();
+        }
+    }
+
+    void Update()
+    {
+        // Verifica a cada frame se o jogador caiu do mapa
+        PlayerFora();
+    }
+
+    void EscondeLimite()
+    {
+        // Busca todos os objetos da cena que possuem a tag "Limite"
+        GameObject[] objetosLimite = GameObject.FindGameObjectsWithTag("Limite");
+
+        // Percorre cada objeto encontrado
+        foreach (GameObject obj in objetosLimite)
+        {
+            // Pega o MeshRenderer do próprio objeto e de todos os seus filhos
+            MeshRenderer[] renderers = obj.GetComponentsInChildren<MeshRenderer>(true);
+
+            // Desativa cada MeshRenderer encontrado
+            foreach (MeshRenderer mr in renderers)
+            {
+                mr.enabled = false;
+            }
+        }
+    }
+
+    void PlayerFora()
+    {
+        // Se a posição Y do jogador for menor que o limite, reinicia a cena atual
+        if (jogador.position.y < limiteY)
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        }
+    }
+}
