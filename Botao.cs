@@ -1,23 +1,27 @@
 using UnityEngine;
-using UnityEngine.SceneManagement; // Necess·rio para poder carregar outras cenas (LoadScene)
+using UnityEngine.SceneManagement; // Necess√°rio para poder carregar outras cenas (LoadScene)
 
 public class Botao : MonoBehaviour
 {
-    // MÈtodo chamado pelo evento OnClick() do componente Button no Inspector
+    // M√©todo chamado pelo evento OnClick() do componente Button no Inspector
     public void IrParaJogo()
     {
-        // Carrega a cena "Jogo" (ela precisa estar adicionada em File > Build Settings > Scenes In Build)
+        // NOVO: zera o checkpoint salvo, garantindo que uma partida nova
+        // sempre comece do in√≠cio, sem herdar o progresso de uma tentativa anterior.
+        CheckpointManager.Resetar();
+
+        // Carrega a cena "Teste" (ela precisa estar adicionada em File > Build Settings > Scenes In Build)
         SceneManager.LoadScene("Teste");
     }
 
-    // Chamado automaticamente pela Unity assim que este script È carregado em uma cena
-    // Como o bot„o fica na cena "Jogo", esse mÈtodo j· roda logo que ela inicia
+    // Chamado automaticamente pela Unity assim que este script √© carregado em uma cena
+    // Como o bot√£o fica na cena "Jogo", esse m√©todo j√° roda logo que ela inicia
     void Awake()
     {
         // Destrava o cursor do mouse, permitindo que ele se mova livremente pela tela
         Cursor.lockState = CursorLockMode.None;
 
-        // Torna o cursor visÌvel novamente na tela
+        // Torna o cursor vis√≠vel novamente na tela
         Cursor.visible = true;
     }
 }
