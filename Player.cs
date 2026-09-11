@@ -4,34 +4,42 @@ public class Player : MonoBehaviour
 {
     [Header("Movimento")]
     public float velocidade = 5f;      // Velocidade de deslocamento do personagem (unidades por segundo)
-    public float forcaPulo = 6f;       // ForÁa aplicada verticalmente ao pular
+    public float forcaPulo = 6f;       // For√ßa aplicada verticalmente ao pular
 
-    [Header("RotaÁ„o do Mouse")]
-    public float sensibilidadeMouse = 200f;   // Quanto o mouse influencia a rotaÁ„o (quanto maior, mais sensÌvel)
-    public Transform cameraPersonagem;        // ReferÍncia da c‚mera (deve ser filha do personagem na Hierarchy)
-    public float limiteAnguloVertical = 80f;  // Limite m·ximo de ‚ngulo para olhar pra cima/baixo (evita giro de 360∞)
+    [Header("Rota√ß√£o do Mouse")]
+    public float sensibilidadeMouse = 200f;   // Quanto o mouse influencia a rota√ß√£o (quanto maior, mais sens√≠vel)
+    public Transform cameraPersonagem;        // Refer√™ncia da c√¢mera (deve ser filha do personagem na Hierarchy)
+    public float limiteAnguloVertical = 80f;  // Limite m√°ximo de √¢ngulo para olhar pra cima/baixo (evita giro de 360¬∞)
 
-    private Rigidbody rb;              // ReferÍncia ao componente Rigidbody do personagem, usado para fÌsica e movimento
-    private float rotacaoVertical = 0f; // Guarda o ‚ngulo vertical atual da c‚mera (acumulado a cada frame)
-    private int contatosNoChao = 0;    // Conta quantas plataformas o personagem est· tocando ao mesmo tempo (usado para permitir o pulo)
+    private Rigidbody rb;              // Refer√™ncia ao componente Rigidbody do personagem, usado para f√≠sica e movimento
+    private float rotacaoVertical = 0f; // Guarda o √¢ngulo vertical atual da c√¢mera (acumulado a cada frame)
+    private int contatosNoChao = 0;    // Conta quantas plataformas o personagem est√° tocando ao mesmo tempo (usado para permitir o pulo)
 
     void Start()
     {
-        rb = GetComponent<Rigidbody>(); // Pega o Rigidbody que est· no mesmo GameObject deste script
-        // Trava o cursor do mouse no centro da tela e o deixa invisÌvel (padr„o em jogos FPS/terceira pessoa)
+        rb = GetComponent<Rigidbody>(); // Pega o Rigidbody que est√° no mesmo GameObject deste script
+        // Trava o cursor do mouse no centro da tela e o deixa invis√≠vel (padr√£o em jogos FPS/terceira pessoa)
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        // NOVO: se j√° existe um checkpoint salvo (sobrevive ao reload de cena),
+        // reposiciona o player nele em vez de nascer no ponto padr√£o da cena.
+        if (CheckpointManager.posicaoCheckpoint.HasValue)
+        {
+            transform.position = CheckpointManager.posicaoCheckpoint.Value;
+            transform.rotation = Quaternion.Euler(0f, CheckpointManager.rotacaoYCheckpoint, 0f);
+        }
     }
 
     void Update()
     {
-        // RotaÁ„o È feita no Update porque o mouse È lido a cada frame renderizado (mais suave visualmente)
+        // Rota√ß√£o √© feita no Update porque o mouse √© lido a cada frame renderizado (mais suave visualmente)
         RotacionarComMouse();
 
-        // Verifica se apertou espaÁo e se est· tocando pelo menos uma plataforma antes de permitir o pulo
+        // Verifica se apertou espa√ßo e se est√° tocando pelo menos uma plataforma antes de permitir o pulo
         if (Input.GetKeyDown(KeyCode.Space) && contatosNoChao > 0)
         {
-            // Aplica uma forÁa instant‚nea para cima (ForceMode.VelocityChange ignora a massa do objeto)
+            // Aplica uma for√ßa instant√¢nea para cima (ForceMode.VelocityChange ignora a massa do objeto)
             rb.AddForce(Vector3.up * forcaPulo, ForceMode.VelocityChange);
         }
 
@@ -45,31 +53,31 @@ public class Player : MonoBehaviour
 
     void FixedUpdate()
     {
-        // Movimento È feito no FixedUpdate porque envolve fÌsica (Rigidbody),
+        // Movimento √© feito no FixedUpdate porque envolve f√≠sica (Rigidbody),
         MovimentarTeclas();
     }
 
-    // LÍ as teclas WASD e movimenta o personagem com base na direÁ„o que ele est· olhando
+    // L√™ as teclas WASD e movimenta o personagem com base na dire√ß√£o que ele est√° olhando
     void MovimentarTeclas()
     {
-        Vector3 movimento = Vector3.zero; // Vetor que vai acumular a direÁ„o do movimento
+        Vector3 movimento = Vector3.zero; // Vetor que vai acumular a dire√ß√£o do movimento
 
-        // transform.forward/right s„o baseados na rotaÁ„o atual do personagem,
-        // ou seja, "frente" sempre È para onde ele est· olhando
+        // transform.forward/right s√£o baseados na rota√ß√£o atual do personagem,
+        // ou seja, "frente" sempre √© para onde ele est√° olhando
         if (Input.GetKey(KeyCode.W))
             movimento += transform.forward;  // Anda para frente
         if (Input.GetKey(KeyCode.S))
-            movimento -= transform.forward;  // Anda para tr·s
+            movimento -= transform.forward;  // Anda para tr√°s
         if (Input.GetKey(KeyCode.A))
             movimento -= transform.right;    // Anda para a esquerda
         if (Input.GetKey(KeyCode.D))
             movimento += transform.right;    // Anda para a direita
 
-        // Normalized garante que andar na diagonal (ex: W+D) n„o seja mais r·pido que andar reto
+        // Normalized garante que andar na diagonal (ex: W+D) n√£o seja mais r√°pido que andar reto
         // Depois multiplica pela velocidade para definir a intensidade do movimento
         movimento = movimento.normalized * velocidade;
 
-        // MantÈm a velocidade vertical atual (queda/pulo) e sÛ altera o movimento horizontal (X e Z)
+        // Mant√©m a velocidade vertical atual (queda/pulo) e s√≥ altera o movimento horizontal (X e Z)
         // Isso evita que o movimento nas teclas "cancele" a gravidade ou o pulo
         movimento.y = rb.velocity.y;
 
@@ -77,28 +85,28 @@ public class Player : MonoBehaviour
         rb.velocity = movimento;
     }
 
-    // Controla a rotaÁ„o do personagem e da c‚mera com base no movimento do mouse
+    // Controla a rota√ß√£o do personagem e da c√¢mera com base no movimento do mouse
     void RotacionarComMouse()
     {
-        // Pega o quanto o mouse se moveu no eixo X (horizontal) e Y (vertical) desde o ˙ltimo frame
+        // Pega o quanto o mouse se moveu no eixo X (horizontal) e Y (vertical) desde o √∫ltimo frame
         float mouseX = Input.GetAxis("Mouse X") * sensibilidadeMouse * Time.deltaTime;
         float mouseY = Input.GetAxis("Mouse Y") * sensibilidadeMouse * Time.deltaTime;
 
         // Rotaciona o personagem inteiro no eixo Y (esquerda/direita)
-        // Isso faz o corpo virar junto, j· que a c‚mera È filha dele
+        // Isso faz o corpo virar junto, j√° que a c√¢mera √© filha dele
         transform.Rotate(Vector3.up * mouseX);
 
-        // SÛ mexe na rotaÁ„o vertical se a c‚mera estiver configurada no Inspector
+        // S√≥ mexe na rota√ß√£o vertical se a c√¢mera estiver configurada no Inspector
         if (cameraPersonagem != null)
         {
-            // Subtrai o mouseY: mover o mouse pra cima deve olhar pra cima (rotaÁ„o negativa no eixo X)
+            // Subtrai o mouseY: mover o mouse pra cima deve olhar pra cima (rota√ß√£o negativa no eixo X)
             rotacaoVertical -= mouseY;
 
-            // Limita o ‚ngulo vertical para n„o deixar o personagem "olhar de cabeÁa para baixo" (giro completo)
+            // Limita o √¢ngulo vertical para n√£o deixar o personagem "olhar de cabe√ßa para baixo" (giro completo)
             rotacaoVertical = Mathf.Clamp(rotacaoVertical, -limiteAnguloVertical, limiteAnguloVertical);
 
-            // Aplica a rotaÁ„o SOMENTE na c‚mera (localRotation), n„o no personagem inteiro
-            // Por isso sÛ o "olhar" sobe/desce, sem inclinar o corpo do personagem
+            // Aplica a rota√ß√£o SOMENTE na c√¢mera (localRotation), n√£o no personagem inteiro
+            // Por isso s√≥ o "olhar" sobe/desce, sem inclinar o corpo do personagem
             cameraPersonagem.localRotation = Quaternion.Euler(rotacaoVertical, 0f, 0f);
         }
     }
@@ -113,12 +121,12 @@ public class Player : MonoBehaviour
         }
     }
 
-    // Chamado automaticamente pela Unity quando o Collider deste objeto n„o est· tocando no outro
+    // Chamado automaticamente pela Unity quando o Collider deste objeto n√£o est√° tocando no outro
     void OnCollisionExit(Collision colisao)
     {
         if (colisao.gameObject.CompareTag("Plataforma"))
         {
-            contatosNoChao--; // Remove esse contato especÌfico; o pulo sÛ È bloqueado quando o contador chegar a 0
+            contatosNoChao--; // Remove esse contato espec√≠fico; o pulo s√≥ √© bloqueado quando o contador chegar a 0
         }
     }
 }
