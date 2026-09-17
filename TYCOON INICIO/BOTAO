@@ -1,7 +1,5 @@
--- ========================================
--- SCRIPT: Botao (fica DENTRO da peça Botao)
+-- Script do botão (fica DENTRO da peça Botao)
 -- Local: Workspace.Botao1.Botao
--- ========================================
 
 -- pega o módulo de economia que guarda dinheiro e carteiras
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -13,40 +11,28 @@ local botao = script.Parent
 -- a pasta "Botao1" que contém o botão e os itens
 local pasta = botao.Parent
 
--- ========================================
--- REFERÊNCIA DIRETA AOS ITENS (pelo nome)
--- se a peça não se chamar exatamente "Item1"/"Item2"
--- dentro da pasta, isso já vai dar erro na hora de
--- rodar o jogo, apontando exatamente o nome errado
--- ========================================
-local item1 = pasta:WaitForChild("Item1")
-local item2 = pasta:WaitForChild("Item2")
-
--- ========================================
--- VARIÁVEL DO PREÇO
--- definida direto aqui no script (não em Attribute)
+-- preço definido direto aqui no script (não em Attribute)
 -- ao duplicar o botão, essa é a única linha que muda
--- ========================================
 local preco = 10
 
 -- variável de controle: impede comprar 2x ao mesmo tempo
 local jaComprado = false
 
--- ========================================
--- FUNÇÃO: libera os itens (deixa visíveis e sólidos)
--- direto nos dois, sem loop e sem depender de tipo
--- ========================================
+-- libera os itens (deixa visíveis e sólidos)
+-- pega automaticamente qualquer peça dentro da pasta,
+-- exceto o próprio botão — não precisa saber os nomes
 local function liberarItens()
-	item1.Transparency = 0
-	item1.CanCollide = true
-
-	item2.Transparency = 0
-	item2.CanCollide = true
+	for _, objeto in ipairs(pasta:GetChildren()) do
+		-- pula o próprio botão, só mexe nos outros objetos da pasta
+		if objeto ~= botao and objeto:IsA("BasePart") then
+			objeto.Transparency = 0
+			objeto.CanCollide = true
+			objeto.Anchored = true -- garante que a peça não caia por causa da física
+		end
+	end
 end
 
--- ========================================
--- EVENTO: quando algo toca no botão
--- ========================================
+-- dispara toda vez que algo toca no botão
 botao.Touched:Connect(function(hit)
 	if jaComprado then return end -- já foi comprado, ignora
 
