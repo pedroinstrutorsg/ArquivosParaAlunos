@@ -1,0 +1,23 @@
+-- Atualiza o texto da UI toda vez que o dinheiro do jogador mudar.
+-- Local: StarterGui.MoneyGui (LocalScript)
+
+local Players = game:GetService("Players")
+local jogador = Players.LocalPlayer
+
+-- caminho até o TextLabel: ajuste se você organizou diferente
+local label = script.Parent:WaitForChild("Frame"):WaitForChild("DinheiroLabel")
+
+-- espera o leaderstats e o valor Dinheiro existirem
+-- (o servidor cria isso logo que o jogador entra, mas pode levar um instante)
+local leaderstats = jogador:WaitForChild("leaderstats")
+local dinheiro = leaderstats:WaitForChild("Dinheiro")
+
+-- função que escreve o valor atual na tela
+local function atualizarTexto()
+	label.Text = "Dinheiro: " .. dinheiro.Value
+end
+
+atualizarTexto() -- mostra o valor assim que a UI carrega
+
+-- toda vez que o número mudar, atualiza o texto de novo
+dinheiro.Changed:Connect(atualizarTexto)
