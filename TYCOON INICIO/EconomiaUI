@@ -1,0 +1,38 @@
+-- Cria e mantém o "leaderstats.Dinheiro" de cada jogador
+-- sincronizado com a carteira do módulo Economia.
+-- Local: ServerScriptService.EconomiaUI
+
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- toda vez que um jogador entra no jogo
+Players.PlayerAdded:Connect(function(jogador)
+	-- "leaderstats" é um nome especial: o Roblox reconhece essa pasta
+	-- e mostra automaticamente o que tiver dentro dela no leaderboard padrão
+	local leaderstats = Instance.new("Folder")
+	leaderstats.Name = "leaderstats"
+	leaderstats.Parent = jogador
+
+	-- o valor numérico que vai representar o dinheiro na tela
+	local dinheiro = Instance.new("IntValue")
+	dinheiro.Name = "Dinheiro"
+	dinheiro.Value = Economia.carteiras[jogador.UserId] or 0
+	dinheiro.Parent = leaderstats
+end)
+
+-- a cada meio segundo, atualiza o valor de leaderstats de todo mundo
+-- com o que estiver guardado de verdade na carteira de cada jogador
+while true do
+	task.wait(0.5)
+
+	for _, jogador in ipairs(Players:GetPlayers()) do
+		local leaderstats = jogador:FindFirstChild("leaderstats")
+		if leaderstats then
+			local dinheiro = leaderstats:FindFirstChild("Dinheiro")
+			if dinheiro then
+				dinheiro.Value = Economia.carteiras[jogador.UserId] or 0
+			end
+		end
+	end
+end
