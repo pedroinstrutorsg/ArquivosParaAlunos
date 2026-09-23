@@ -1,0 +1,83 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
+using UnityEditor; // Necessário para reconhecer o tipo SceneAsset (só existe dentro do editor)
+#endif
+
+public class TrocaCena : MonoBehaviour
+{
+    // CENA DE DESTINO
+
+    // Campo onde você arrasta a cena da pasta Assets.
+    // É do tipo Object porque o tipo "cena" (SceneAsset) só existe dentro do editor.
+    // No jogo final (build) a Unity não conhece esse tipo, então guardamos também o nome da cena.
+    [Header("Cena de Destino")]
+    [Tooltip("Arraste aqui a cena para onde o player será enviado (pela pasta Assets)")]
+    public Object cena;
+
+    // Nome da cena, preenchido automaticamente quando você arrasta a cena no campo acima.
+    // Fica escondido no Inspetor porque você não precisa mexer nele.
+    [SerializeField, HideInInspector]
+    private string nomeCena;
+
+    // CHECKPOINT
+
+    [Header("Checkpoint")]
+    [Tooltip("Se marcado, apaga o checkpoint salvo antes de trocar de cena. Deixe marcado ao ir para uma fase nova")]
+    public bool resetarCheckpoint = true;
+
+#if UNITY_EDITOR
+    // Chamado automaticamente pela Unity sempre que algo muda no Inspetor
+    void OnValidate()
+    {
+        // Se o campo estiver vazio, apaga o nome guardado
+        if (cena == null)
+        {
+            nomeCena = "";
+            return;
+        }
+
+        // Garante que o que foi arrastado é realmente uma cena
+        if (cena is SceneAsset)
+        {
+            nomeCena = cena.name; // Guarda o nome da cena para usar no jogo
+        }
+        else
+        {
+            Debug.LogWarning("O objeto arrastado em TrocaCena não é uma cena.", this);
+            cena = null;
+            nomeCena = "";
+        }
+    }
+#endif
+
+    // Chamado quando outro collider entra no gatilho (o Collider precisa estar com Is Trigger marcado)
+    void OnTriggerEnter(Collider other)
+    {
+        // Só reage ao Player
+        if (!other.CompareTag("Player")) return;
+
+        // Se nenhuma cena foi arrastada, avisa no Console e não faz nada
+        if (string.IsNullOrEmpty(nomeCena))
+        {
+            Debug.LogWarning("TrocaCena sem cena de destino configurada.", this);
+            return;
+        }
+
+        // Se a cena não estiver no Build Settings, a Unity não consegue carregar
+        if (!Application.CanStreamedLevelBeLoaded(nomeCena))
+        {
+            Debug.LogError("A cena \"" + nomeCena + "\" não está no Build Settings. Adicione ela em File > Build Settings.", this);
+            return;
+        }
+
+        // Apaga o checkpoint da fase atual, para o player não nascer na posição de um checkpoint da cena antiga
+        if (resetarCheckpoint)
+        {
+            CheckpointManager.Resetar();
+        }
+
+        // Carrega a cena escolhida
+        SceneManager.LoadScene(nomeCena);
+    }
+}
