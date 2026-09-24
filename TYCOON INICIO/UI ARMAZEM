@@ -1,0 +1,28 @@
+-- ========================================
+-- SCRIPT: PAINEL DO ARMAZÉM
+-- Mostra num bloco quanto dinheiro está guardado no armazém
+-- Local: Workspace.PainelArmazem
+-- ========================================
+
+-- pega o módulo Economia (o mesmo que o Gerador e o Coletor usam)
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- o bloco onde o script está e o texto que fica dentro dele
+local painel = script.Parent
+local texto = painel:WaitForChild("SurfaceGui"):WaitForChild("TextLabel")
+
+-- ========================================
+-- CONFIGURAÇÕES DO PAINEL
+-- ========================================
+local intervaloAtualizacao = 0.5  -- de quantos em quantos segundos o texto atualiza
+local prefixo = "Armazém: $"      -- o que aparece antes do número
+
+-- ========================================
+-- LOOP INFINITO: atualiza o texto para sempre
+-- ========================================
+while true do
+	-- junta o prefixo com o valor atual do armazém
+	texto.Text = prefixo .. Economia.armazem
+	task.wait(intervaloAtualizacao)
+end
