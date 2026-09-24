@@ -1,0 +1,22 @@
+-- ========================================
+-- SCRIPT: BLOCO
+-- O "material" que cai do gerador e vale dinheiro
+-- Local: ServerStorage.Blocos.BlocoComum.Bloco
+-- ========================================
+
+local bloco = script.Parent
+
+-- ========================================
+-- CONFIGURAÇÕES DO BLOCO
+-- ========================================
+local valor = 5          -- quanto dinheiro esse bloco vale
+local tempoDeVida = 20   -- segundos até o bloco sumir sozinho (caso caia fora)
+
+-- guarda o valor no próprio bloco para outros scripts lerem
+-- (o DestinoFinal vai usar isso no futuro)
+bloco:SetAttribute("Valor", valor)
+
+-- o Debris destrói o bloco depois de X segundos, sem travar o script
+-- se ele já tiver sido destruído antes (pelo DestinoFinal), não dá erro
+local Debris = game:GetService("Debris")
+Debris:AddItem(bloco, tempoDeVida)
