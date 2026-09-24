@@ -1,27 +1,49 @@
 -- ========================================
--- SCRIPT: GERADOR
--- Gera dinheiro automaticamente a cada X segundos
--- e guarda no armazém do módulo Economia
+-- SCRIPT: GERADOR (DROPPER)
+-- Cria um bloco a cada X segundos embaixo do gerador
+-- Local: dentro da peça Gerador
 -- ========================================
 
--- pega o módulo Economia para usar suas funções e variáveis
-local ServerScriptService = game:GetService("ServerScriptService")
-local Economia = require(ServerScriptService.Economia)
+local ServerStorage = game:GetService("ServerStorage")
+
+-- a própria peça do gerador
+local gerador = script.Parent
 
 -- ========================================
 -- CONFIGURAÇÕES DO GERADOR
 -- ========================================
-local intervaloGeracao = 5 -- segundos entre cada geração de dinheiro
-local dinheiroPorCiclo = 10 -- quanto dinheiro é gerado por vez
+local tipoDeBloco = "BlocoComum"  -- nome do molde dentro de ServerStorage.Blocos
+local intervaloCriacao = 3        -- segundos entre cada bloco
+
+-- pega o molde do bloco escolhido
+local molde = ServerStorage.Blocos:WaitForChild(tipoDeBloco)
 
 -- ========================================
--- LOOP INFINITO: roda pra sempre enquanto o jogo estiver ativo
+-- FUNÇÃO: cria um bloco novo embaixo do gerador
+-- ========================================
+local function criarBloco()
+	local bloco = molde:Clone() -- faz uma cópia do molde
+
+	-- posiciona logo abaixo do gerador
+	local distancia = gerador.Size.Y / 2 + bloco.Size.Y / 2 + 0.5
+	bloco.CFrame = gerador.CFrame * CFrame.new(0, -distancia, 0)
+
+	bloco.Anchored = false -- deixa a física agir (o bloco cai)
+	bloco.Parent = workspace -- coloca no mundo, e o script Bloco começa a rodar
+
+	-- o servidor controla a física do bloco (evita que ele "trema")
+	bloco:SetNetworkOwner(nil)
+end
+
+-- ========================================
+-- LOOP INFINITO: cria blocos para sempre
 -- ========================================
 while true do
-	task.wait(intervaloGeracao) -- "pausa" o script por X segundos antes de continuar
+	task.wait(intervaloCriacao)
 
-	Economia.adicionarAoArmazem(dinheiroPorCiclo) -- chama a função do módulo
-
-	-- toda vez que o ciclo se repete, mostra quanto tem guardado
-	print("Novo ciclo! Dinheiro guardado no armazém: " .. Economia.armazem)
+	-- só gera se o gerador já foi comprado
+	-- (o botão deixa a peça visível ao comprar)
+	if gerador.Transparency < 1 then
+		criarBloco()
+	end
 end
