@@ -1,0 +1,176 @@
+using UnityEngine;
+
+// Faz o objeto crescer para as direções escolhidas, mantendo o lado oposto parado.
+// Ex.: se crescer só para "Cima", a base do objeto fica no mesmo lugar.
+public class CrescimentoDirecional : MonoBehaviour
+{
+    [System.Serializable]
+    public class Direcao
+    {
+        [Tooltip("Marque para o objeto crescer nesta direção")]
+        public bool ativa = false;
+
+        [Tooltip("Quanto o objeto vai crescer nesta direção (em metros / unidades da Unity)")]
+        public float quantidade = 2f;
+
+        [Tooltip("Velocidade do crescimento (metros por segundo)")]
+        public float velocidade = 1f;
+
+        [Tooltip("Se marcado, ao chegar no tamanho máximo ele volta ao formato original e depois cresce de novo, repetindo sempre")]
+        public bool vaiEVolta = false;
+
+        [HideInInspector] public float crescimentoAtual = 0f;
+        [HideInInspector] public bool voltando = false;
+    }
+
+    [Header("Direções de crescimento")]
+    public Direcao cima = new Direcao();      // +Y
+    public Direcao baixo = new Direcao();     // -Y
+    public Direcao direita = new Direcao();   // +X
+    public Direcao esquerda = new Direcao();  // -X
+    public Direcao frente = new Direcao();    // +Z
+    public Direcao tras = new Direcao();      // -Z
+
+    [Header("Controle")]
+    [Tooltip("Se marcado, começa a crescer assim que o jogo inicia (depois do tempo de espera)")]
+    public bool crescerAoIniciar = true;
+
+    [Tooltip("Quantos segundos esperar antes de começar a crescer")]
+    public float tempoParaComecar = 0f;
+
+    private bool crescendo = false;
+    private float timer = 0f;
+    private Vector3 escalaInicial;
+    private Vector3 posicaoInicial;
+    private Vector3 tamanhoBase = Vector3.one; // tamanho da malha com escala 1
+
+    void Start()
+    {
+        escalaInicial = transform.localScale;
+        posicaoInicial = transform.localPosition;
+
+        // Descobre o tamanho real da malha (um Cube padrão tem tamanho 1)
+        MeshFilter mf = GetComponent<MeshFilter>();
+        if (mf != null && mf.sharedMesh != null)
+        {
+            tamanhoBase = mf.sharedMesh.bounds.size;
+            if (tamanhoBase.x == 0) tamanhoBase.x = 1;
+            if (tamanhoBase.y == 0) tamanhoBase.y = 1;
+            if (tamanhoBase.z == 0) tamanhoBase.z = 1;
+        }
+
+        if (crescerAoIniciar)
+            Crescer();
+    }
+
+    void Update()
+    {
+        if (!crescendo) return;
+
+        // Espera o timer antes de começar
+        if (timer > 0f)
+        {
+            timer -= Time.deltaTime;
+            return;
+        }
+
+        Avancar(cima);
+        Avancar(baixo);
+        Avancar(direita);
+        Avancar(esquerda);
+        Avancar(frente);
+        Avancar(tras);
+
+        AplicarTamanho();
+    }
+
+    // Faz o crescimento de uma direção andar até o alvo
+    void Avancar(Direcao d)
+    {
+        float alvo;
+
+        if (!d.ativa)
+        {
+            alvo = 0f; // direção desligada volta ao original
+        }
+        else if (d.vaiEVolta)
+        {
+            // Chegou no máximo: começa a voltar
+            if (!d.voltando && d.crescimentoAtual >= d.quantidade)
+                d.voltando = true;
+            // Chegou no original: começa a crescer de novo
+            else if (d.voltando && d.crescimentoAtual <= 0f)
+                d.voltando = false;
+
+            alvo = d.voltando ? 0f : d.quantidade;
+        }
+        else
+        {
+            d.voltando = false;
+            alvo = d.quantidade;
+        }
+
+        d.crescimentoAtual = Mathf.MoveTowards(d.crescimentoAtual, alvo, d.velocidade * Time.deltaTime);
+    }
+
+    void AplicarTamanho()
+    {
+        // Quanto cresceu no total em cada eixo
+        float totalX = direita.crescimentoAtual + esquerda.crescimentoAtual;
+        float totalY = cima.crescimentoAtual + baixo.crescimentoAtual;
+        float totalZ = frente.crescimentoAtual + tras.crescimentoAtual;
+
+        // Nova escala
+        transform.localScale = new Vector3(
+            escalaInicial.x + totalX / tamanhoBase.x,
+            escalaInicial.y + totalY / tamanhoBase.y,
+            escalaInicial.z + totalZ / tamanhoBase.z
+        );
+
+        // Move o centro metade do crescimento para o lado que cresceu,
+        // assim o lado oposto fica parado no lugar
+        Vector3 deslocamento = new Vector3(
+            (direita.crescimentoAtual - esquerda.crescimentoAtual) / 2f,
+            (cima.crescimentoAtual - baixo.crescimentoAtual) / 2f,
+            (frente.crescimentoAtual - tras.crescimentoAtual) / 2f
+        );
+
+        // Usa a rotação do objeto, então "cima" é o cima do próprio objeto
+        transform.localPosition = posicaoInicial + transform.localRotation * deslocamento;
+    }
+
+    // ---------- Funções que podem ser chamadas por outros scripts ou botões ----------
+
+    // Começa a crescer (respeitando o tempo de espera)
+    public void Crescer()
+    {
+        timer = tempoParaComecar;
+        crescendo = true;
+    }
+
+    // Pausa o crescimento
+    public void Pausar()
+    {
+        crescendo = false;
+    }
+
+    // Continua de onde parou, sem esperar o timer de novo
+    public void Continuar()
+    {
+        timer = 0f;
+        crescendo = true;
+    }
+
+    // Volta o objeto ao tamanho e posição originais
+    public void Resetar()
+    {
+        Direcao[] todas = { cima, baixo, direita, esquerda, frente, tras };
+        foreach (Direcao d in todas)
+        {
+            d.crescimentoAtual = 0f;
+            d.voltando = false;
+        }
+        AplicarTamanho();
+        crescendo = false;
+    }
+}
