@@ -1,0 +1,41 @@
+-- ========================================
+-- SCRIPT: DESTINO FINAL
+-- Quando um bloco encosta aqui, espera um pouco,
+-- o bloco some e o valor vai pro armazém
+-- Local: dentro da peça DestinoFinal
+-- ========================================
+
+-- pega o módulo Economia (o mesmo do Coletor e do painel)
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+local destino = script.Parent
+
+-- ========================================
+-- CONFIGURAÇÕES DO DESTINO
+-- ========================================
+local tempoAteSumir = 1  -- segundos entre o bloco tocar e ser destruído
+
+-- ========================================
+-- EVENTO: dispara toda vez que algo toca no destino
+-- ========================================
+destino.Touched:Connect(function(hit)
+	-- lê a "etiqueta de preço" que o script Bloco colocou
+	local valor = hit:GetAttribute("Valor")
+
+	-- se não tem etiqueta, não é um bloco (pode ser o jogador): ignora
+	if not valor then return end
+
+	-- tira a etiqueta NA HORA, para o bloco não ser vendido 2x
+	-- enquanto ele ainda está encostado esperando o tempo passar
+	hit:SetAttribute("Valor", nil)
+
+	-- espera antes de destruir
+	-- (só este bloco espera; os outros continuam sendo vendidos normalmente)
+	task.wait(tempoAteSumir)
+
+	hit:Destroy() -- o bloco some
+	Economia.adicionarAoArmazem(valor) -- o dinheiro vai pro armazém
+
+	print("Bloco vendido por " .. valor .. "! Armazém: " .. Economia.armazem)
+end)
