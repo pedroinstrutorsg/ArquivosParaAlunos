@@ -1,0 +1,20 @@
+-- ========================================
+-- SCRIPT: ESTEIRA
+-- Empurra blocos e jogadores para a frente da peça
+-- Local: dentro da peça Esteira
+-- ========================================
+
+local esteira = script.Parent
+
+-- ========================================
+-- CONFIGURAÇÕES DA ESTEIRA
+-- ========================================
+local velocidade = 15  -- quanto mais alto, mais rápido empurra (studs por segundo)
+
+-- a esteira fica parada no lugar, mas "finge" que está andando:
+-- tudo o que encosta nela recebe essa velocidade
+esteira.Anchored = true
+
+-- LookVector é a direção da frente da peça
+-- multiplicar pela velocidade dá o "empurrão" naquela direção
+esteira.AssemblyLinearVelocity = esteira.CFrame.LookVector * velocidade
