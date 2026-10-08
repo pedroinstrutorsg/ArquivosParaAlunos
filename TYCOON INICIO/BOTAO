@@ -1,62 +1,226 @@
--- Script do botão (fica DENTRO da peça Botao)
--- Local: Workspace.Botao1.Botao
+-- ========================================
+-- SCRIPT: BOTÃO DE COMPRA
+-- Esconde tudo o que está na pasta do botão quando o jogo começa
+-- e mostra de volta, do jeito original, quando o jogador compra.
+-- Funciona com Parts, Unions, MeshParts, Models e itens da Toolbox.
+-- Botões podem ficar dentro da pasta de outro botão: eles só
+-- aparecem depois que o botão de fora for comprado.
+-- Local: dentro da peça Botao (ex: Workspace.Botao1.Botao)
+-- IMPORTANTE: toda peça de botão precisa se chamar "Botao"
+-- ========================================
 
--- pega o módulo de economia que guarda dinheiro e carteiras
 local ServerScriptService = game:GetService("ServerScriptService")
+local Players = game:GetService("Players")
 local Economia = require(ServerScriptService.Economia)
 
--- a própria peça que o script está dentro (o botão)
+-- a própria peça do botão e a pasta onde ele está
 local botao = script.Parent
-
--- a pasta "Botao1" que contém o botão e os itens
 local pasta = botao.Parent
 
--- preço definido direto aqui no script (não em Attribute)
--- ao duplicar o botão, essa é a única linha que muda
-local preco = 10
+-- ========================================
+-- CONFIGURAÇÕES DO BOTÃO
+-- ========================================
+local preco = 0              -- quanto custa liberar os itens desta pasta
+local ancorarAoComprar = true -- true: tudo fica preso no lugar depois da compra (bom para decoração)
+-- false: cada peça volta exatamente como era (bom para NPCs, portas, veículos)
 
--- variável de controle: impede comprar 2x ao mesmo tempo
-local jaComprado = false
+-- ========================================
+-- VARIÁVEIS DE CONTROLE
+-- ========================================
+local jaComprado = false   -- impede comprar 2x ao mesmo tempo
+local liberado = true      -- false enquanto o botão de fora ainda não foi comprado
+local originalItens = {}   -- como cada item da pasta era antes de ser escondido
+local originalBotao = {}   -- como o próprio botão era antes de ser escondido
 
--- libera os itens (deixa visíveis e sólidos)
--- pega automaticamente qualquer peça dentro da pasta,
--- exceto o próprio botão — não precisa saber os nomes
-local function liberarItens()
-	for _, objeto in ipairs(pasta:GetChildren()) do
-		-- pula o próprio botão, só mexe nos outros objetos da pasta
-		if objeto ~= botao and objeto:IsA("BasePart") then
-			objeto.Transparency = 0
-			objeto.CanCollide = true
-			objeto.Anchored = true -- garante que a peça não caia por causa da física
+-- tipos de objeto que têm a propriedade "Enabled" (ligado/desligado)
+local tiposComEnabled = {
+	"Script", "ParticleEmitter", "Light", "Fire", "Smoke", "Sparkles",
+	"Beam", "Trail", "SurfaceGui", "BillboardGui", "ProximityPrompt",
+}
+
+-- ========================================
+-- FUNÇÕES DE AJUDA
+-- ========================================
+
+-- confere se o objeto é de algum tipo da lista tiposComEnabled
+local function temEnabled(objeto)
+	for _, tipo in ipairs(tiposComEnabled) do
+		if objeto:IsA(tipo) then
+			return true
+		end
+	end
+	return false
+end
+
+-- confere se o objeto é o botão ou algo dentro dele
+local function ehDoBotao(objeto)
+	return objeto == botao or objeto:IsDescendantOf(botao)
+end
+
+-- confere se o objeto está na pasta de OUTRO botão (um botão de dentro)
+-- sobe pelas pastas do objeto até chegar na nossa pasta;
+-- se no caminho achar uma pasta com outro "Botao", o objeto é dele
+local function ehDeOutroBotao(objeto)
+	local atual = objeto.Parent
+	while atual and atual ~= pasta do
+		local outro = atual:FindFirstChild("Botao")
+		if outro and outro ~= botao and outro:IsA("BasePart") then
+			return true
+		end
+		atual = atual.Parent
+	end
+	return false
+end
+
+-- procura um botão nas pastas ACIMA da nossa (o botão "pai")
+-- se achar, este botão só aparece depois que aquele for comprado
+local function acharBotaoPai()
+	local atual = pasta.Parent
+	while atual and atual ~= game do
+		local outro = atual:FindFirstChild("Botao")
+		if outro and outro:IsA("BasePart") then
+			return outro
+		end
+		atual = atual.Parent
+	end
+	return nil
+end
+
+-- anota como o objeto é agora (na tabela escolhida) e depois esconde/desliga ele
+local function esconder(objeto, tabela)
+	if objeto:IsA("BasePart") then
+		-- qualquer peça física: Part, Union, MeshPart, Wedge...
+		tabela[objeto] = {
+			Transparency = objeto.Transparency,
+			CanCollide = objeto.CanCollide,
+			CanTouch = objeto.CanTouch,
+			CanQuery = objeto.CanQuery,
+			Anchored = objeto.Anchored,
+		}
+		objeto.Transparency = 1
+		objeto.CanCollide = false
+		objeto.CanTouch = false
+		objeto.CanQuery = false
+		objeto.Anchored = true -- escondida e sem colisão, ela cairia do mapa
+
+	elseif objeto:IsA("Decal") then
+		-- imagens coladas nas peças (Texture também conta como Decal)
+		tabela[objeto] = { Transparency = objeto.Transparency }
+		objeto.Transparency = 1
+
+	elseif objeto:IsA("Sound") then
+		tabela[objeto] = { Playing = objeto.Playing }
+		objeto:Stop()
+
+	elseif temEnabled(objeto) then
+		tabela[objeto] = { Enabled = objeto.Enabled }
+		objeto.Enabled = false
+	end
+end
+
+-- devolve as propriedades que foram anotadas
+local function restaurar(objeto, propriedades)
+	for nome, valor in pairs(propriedades) do
+		objeto[nome] = valor
+	end
+	if ancorarAoComprar and objeto:IsA("BasePart") then
+		objeto.Anchored = true
+	end
+end
+
+-- mostra de volta tudo o que está numa tabela:
+-- primeiro peças e efeitos, depois os scripts
+local function mostrarTudo(tabela)
+	local scripts = {}
+	for objeto, propriedades in pairs(tabela) do
+		if objeto.Parent then -- pula objetos destruídos no meio do jogo
+			if objeto:IsA("Script") then
+				table.insert(scripts, objeto)
+			else
+				restaurar(objeto, propriedades)
+			end
+		end
+	end
+	for _, s in ipairs(scripts) do
+		restaurar(s, tabela[s])
+	end
+end
+
+-- esconde o próprio botão (e o que tiver dentro dele, como textos de preço)
+-- o script que está rodando agora nunca é desligado
+local function esconderBotao()
+	esconder(botao, originalBotao)
+	for _, objeto in ipairs(botao:GetDescendants()) do
+		if objeto ~= script then
+			esconder(objeto, originalBotao)
 		end
 	end
 end
 
--- dispara toda vez que algo toca no botão
+-- ========================================
+-- QUANDO O JOGO COMEÇA
+-- ========================================
+
+-- 1) esconde os itens desta pasta
+-- (pula o próprio botão e tudo o que pertence a botões de dentro)
+for _, objeto in ipairs(pasta:GetDescendants()) do
+	if not ehDoBotao(objeto) and not ehDeOutroBotao(objeto) then
+		esconder(objeto, originalItens)
+	end
+end
+
+-- 2) se existe um botão acima deste, este botão começa escondido
+-- e só aparece quando aquele for comprado
+local botaoPai = acharBotaoPai()
+
+if botaoPai then
+	liberado = false
+	esconderBotao()
+
+	local function aparecer()
+		if liberado then return end
+		liberado = true
+		mostrarTudo(originalBotao)
+	end
+
+	-- o botão de cima ganha a marca "Comprado" quando é comprado
+	botaoPai:GetAttributeChangedSignal("Comprado"):Connect(function()
+		if botaoPai:GetAttribute("Comprado") then
+			aparecer()
+		end
+	end)
+
+	-- se o botão de cima já tiver sido comprado, aparece na hora
+	if botaoPai:GetAttribute("Comprado") then
+		aparecer()
+	end
+end
+
+-- ========================================
+-- EVENTO: dispara toda vez que algo toca no botão
+-- ========================================
 botao.Touched:Connect(function(hit)
-	if jaComprado then return end -- já foi comprado, ignora
+	if jaComprado or not liberado then return end -- já comprado ou ainda bloqueado
 
 	-- descobre se quem tocou é um jogador (e não um objeto qualquer)
-	local personagem = hit.Parent
-	local jogador = game.Players:GetPlayerFromCharacter(personagem)
-	if not jogador then return end -- não é um jogador, ignora
+	local jogador = Players:GetPlayerFromCharacter(hit.Parent)
+	if not jogador then return end
 
 	-- confere quanto dinheiro o jogador tem na carteira
 	local carteira = Economia.carteiras[jogador.UserId] or 0
 
 	if carteira >= preco then
-		jaComprado = true -- trava a compra imediatamente (evita duplicidade)
+		jaComprado = true -- trava a compra na hora
 
-		-- desconta o preço da carteira do jogador
+		-- desconta o preço e libera os itens desta pasta
 		Economia.carteiras[jogador.UserId] = carteira - preco
+		mostrarTudo(originalItens)
 
-		-- revela os itens que essa compra desbloqueia
-		liberarItens()
+		-- o próprio botão some (e o que tiver dentro dele, como textos de preço)
+		esconderBotao()
 
-		-- o próprio botão some, igual os itens começavam
-		botao.Transparency = 1
-		botao.CanCollide = false
-		botao.CanTouch = false -- garante que Touched não dispare de novo
+		-- marca este botão como comprado: os botões de dentro vão aparecer
+		botao:SetAttribute("Comprado", true)
 
 		print(jogador.Name .. " comprou por " .. preco)
 	else
