@@ -1,0 +1,76 @@
+-- ========================================
+-- SCRIPT: UPGRADE
+-- Portal colocado no caminho da esteira.
+-- Quando um bloco passa por ele, o valor do bloco aumenta
+-- e o bloco ganha um efeito de brilho (ou muda a cor do brilho que já tem).
+-- O jogador consegue atravessar o portal normalmente.
+-- Local: dentro da peça Upgrade
+-- ========================================
+
+local upgrade = script.Parent
+
+-- ========================================
+-- CONFIGURAÇÕES DO UPGRADE
+-- ========================================
+local multiplicador = 2                          -- o valor do bloco é multiplicado por isso
+local bonus = 0                                  -- e depois somado com isso
+local corDoEfeito = Color3.fromRGB(242, 255, 0)  -- cor do brilho que o bloco ganha
+local nomeDoEfeito = "EfeitoUpgrade"             -- nome do efeito (todos os upgrades usam o mesmo)
+
+-- o portal fica parado, não bloqueia ninguém, mas percebe quem passa por dentro
+upgrade.Anchored = true
+upgrade.CanCollide = false -- jogador e blocos atravessam
+upgrade.CanTouch = true    -- mesmo atravessando, o Touched continua funcionando
+
+-- lista dos blocos que já passaram por ESTE upgrade
+-- (para o mesmo bloco não ser melhorado várias vezes)
+local jaMelhorados = {}
+
+-- ========================================
+-- FUNÇÃO: coloca o efeito no bloco, ou muda a cor se ele já tiver
+-- ========================================
+local function aplicarEfeito(bloco)
+	-- procura se o bloco já tem um efeito de upgrade
+	local efeito = bloco:FindFirstChild(nomeDoEfeito)
+
+	-- se não tem, cria um novo
+	if not efeito then
+		efeito = Instance.new("ParticleEmitter")
+		efeito.Name = nomeDoEfeito
+		efeito.Rate = 15                              -- partículas por segundo
+		efeito.Lifetime = NumberRange.new(1, 2)   -- quanto tempo cada partícula dura
+		efeito.Speed = NumberRange.new(2, 5)          -- velocidade das partículas
+		efeito.Size = NumberSequence.new(0.75)        -- tamanho das partículas
+		efeito.LightEmission = 1                      -- deixa as partículas brilhando
+		efeito.Parent = bloco
+	end
+
+	-- tendo ou não tendo antes, o efeito fica com a cor DESTE upgrade
+	efeito.Color = ColorSequence.new(corDoEfeito)
+end
+
+-- ========================================
+-- EVENTO: dispara toda vez que algo passa por dentro do upgrade
+-- ========================================
+upgrade.Touched:Connect(function(hit)
+	-- só blocos têm a etiqueta "Valor"; jogador e outras peças são ignorados
+	local valor = hit:GetAttribute("Valor")
+	if not valor then return end
+
+	-- se este bloco já passou por aqui, ignora
+	if jaMelhorados[hit] then return end
+	jaMelhorados[hit] = true
+
+	-- quando o bloco for destruído, tira ele da lista (para a lista não crescer pra sempre)
+	hit.Destroying:Once(function()
+		jaMelhorados[hit] = nil
+	end)
+
+	-- calcula o novo valor e arredonda (para não virar 7.5, por exemplo)
+	local novoValor = math.floor(valor * multiplicador + bonus + 0.5)
+	hit:SetAttribute("Valor", novoValor)
+
+	aplicarEfeito(hit)
+
+	print("Upgrade! Bloco foi de " .. valor .. " para " .. novoValor)
+end)
