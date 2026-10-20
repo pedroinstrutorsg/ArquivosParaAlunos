@@ -1,0 +1,38 @@
+using UnityEngine;
+using UnityEngine.SceneManagement; // Necessário para poder recarregar a cena
+public class MortePlayer : MonoBehaviour
+{
+    [Tooltip("Se ativa, o objeto reinicia a cena ao tocar o Player")] // Nos permite escolher o texto que aparece no inspetor
+    public bool mata = true; // Variável que define se o objeto mata o player (reinicia a cena) ao encostar nele
+    [Tooltip("Tempo em segundos até a cena reiniciar depois de encostar no Player")]
+    public float tempoParaReiniciar = 0f; // Variável de espera com valor padrão 0 (reinicia na hora)
+    private bool playerMorreu = false; // Variável que verifica se o player já morreu, evitando reiniciar a cena mais de uma vez
+
+    void OnCollisionEnter(Collision collision) // Função (OnCollisionEnter) acionada quando um objeto sólido encosta neste objeto
+    {
+        if (collision.gameObject.CompareTag("Player")) // Verifica se a tag do objeto é exatamente "Player"
+        {
+            MatarPlayer(); // Chama a função que reinicia a cena
+        }
+    }
+    void OnTriggerEnter(Collider other) // Função (OnTriggerEnter) acionada quando um objeto entra em um collider marcado como "Is Trigger"
+    {
+        if (other.CompareTag("Player")) // Verifica se a tag do objeto é exatamente "Player"
+        {
+            MatarPlayer(); // Chama a mesma função, assim o script funciona tanto com collider sólido quanto com trigger
+        }
+    }
+    void MatarPlayer() // Função criada por nós que cuida da morte do player
+    {
+        if (!mata || playerMorreu) // Se o objeto não mata ou o player já morreu, não faz nada
+        {
+            return; // Encerra a função aqui
+        }
+        playerMorreu = true; // Transforma a variável em verdadeira para não reiniciar duas vezes
+        Invoke("ReiniciarCena", tempoParaReiniciar); // Chama a função ReiniciarCena depois do tempo escolhido no inspetor
+    }
+    void ReiniciarCena() // Função que recarrega a cena atual
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); // Carrega de novo a cena que está aberta, reiniciando a fase
+    }
+}

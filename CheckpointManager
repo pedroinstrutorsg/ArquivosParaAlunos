@@ -1,0 +1,25 @@
+using UnityEngine;
+
+// Classe estática: seus valores sobrevivem a um SceneManager.LoadScene,
+// já que não são destruídos junto com os objetos da cena antiga.
+public static class CheckpointManager
+{
+    // Posição do último checkpoint tocado. Null = ainda não tocou em nenhum.
+    public static Vector3? posicaoCheckpoint = null;
+
+    // Rotação horizontal do personagem no momento do checkpoint,
+    // pra ele não "virar de costas" ao respawnar.
+    public static float rotacaoYCheckpoint = 0f;
+
+    // Índice do checkpoint mais avançado já tocado, pra evitar retroceder
+    // caso o player toque um checkpoint anterior de novo.
+    public static int indiceCheckpoint = -1;
+
+    // Chame isso quando o player começar a fase do zero (ex: vindo do menu pelo Botao.cs)
+    public static void Resetar()
+    {
+        posicaoCheckpoint = null;
+        rotacaoYCheckpoint = 0f;
+        indiceCheckpoint = -1;
+    }
+}
