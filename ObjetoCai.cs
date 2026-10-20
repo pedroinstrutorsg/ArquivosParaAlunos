@@ -4,49 +4,66 @@ using UnityEngine;
 public class ObjetoCai : MonoBehaviour
 {
 
-    // CONFIGURA«√O DE QUEDA
+    // CONFIGURA√á√ÉO DE QUEDA
 
-    [Header("ConfiguraÁ„o de Queda")]
-    [Tooltip("Tempo em segundos entre o player encostar e a plataforma comeÁar a cair")]
+    [Header("Configura√ß√£o de Queda")]
+    [Tooltip("Tempo em segundos entre o player encostar e a plataforma come√ßar a cair")]
     public float delayParaCair = 1f;
 
-    // Flag para garantir que a queda sÛ seja ativada uma ˙nica vez
-    // (evita que o player, encostando v·rias vezes, dispare repetidamente)
+    [Tooltip("For√ßa da gravidade nesta plataforma.\n1 = gravidade normal\n2 = cai duas vezes mais forte\n0.5 = cai devagar, como na Lua\n0 = n√£o cai (fica flutuando)")]
+    [Min(0f)]
+    public float multiplicadorGravidade = 1f;
+
+    // Flag para garantir que a queda s√≥ seja ativada uma √∫nica vez
+    // (evita que o player, encostando v√°rias vezes, dispare repetidamente)
     private bool jaAtivada = false;
 
-    // Chamado automaticamente pela Unity quando outro collider sÛlido encosta neste objeto
+    // Rigidbody criado na hora da queda (fica vazio at√© a plataforma come√ßar a cair)
+    private Rigidbody rb;
+
+    // Chamado automaticamente pela Unity quando outro collider s√≥lido encosta neste objeto
     void OnCollisionEnter(Collision collision)
     {
-        // Verifica se quem colidiu foi o Player (pela tag) e se a queda ainda n„o foi ativada
+        // Verifica se quem colidiu foi o Player (pela tag) e se a queda ainda n√£o foi ativada
         if (collision.gameObject.CompareTag("Player") && !jaAtivada)
         {
-            // Marca como ativada imediatamente, para n„o iniciar de novo
-            // caso o player encoste v·rias vezes antes do delay terminar
+            // Marca como ativada imediatamente, para n√£o iniciar de novo
+            // caso o player encoste v√°rias vezes antes do delay terminar
             jaAtivada = true;
 
-            // Inicia o delay e depois ativa a gravidade
+            // Inicia o delay e depois ativa a queda
             StartCoroutine(AtivarQueda());
         }
     }
 
-    // espera um tempo (delay) e ent„o ativa a fÌsica de queda da plataforma
+    // espera um tempo (delay) e ent√£o ativa a f√≠sica de queda da plataforma
     IEnumerator AtivarQueda()
     {
         // Espera o tempo definido em "delayParaCair" antes de continuar
-        // Isso d· o "aviso" de que a plataforma vai cair (d· tempo do player sair de cima, se quiser)
+        // Isso d√° o "aviso" de que a plataforma vai cair (d√° tempo do player sair de cima, se quiser)
         yield return new WaitForSeconds(delayParaCair);
 
-        // Como a plataforma N√O tem Rigidbody (È totalmente est·tica), precisamos adicionar um em tempo de execuÁ„o
-        // AddComponent<Rigidbody>() cria e anexa um Rigidbody novo ao GameObject, com valores padr„o
-        Rigidbody rb = gameObject.AddComponent<Rigidbody>();
+        // Como a plataforma N√ÉO tem Rigidbody (√© totalmente est√°tica), precisamos adicionar um em tempo de execu√ß√£o
+        // AddComponent<Rigidbody>() cria e anexa um Rigidbody novo ao GameObject, com valores padr√£o
+        rb = gameObject.AddComponent<Rigidbody>();
 
-        // Garante que a gravidade est· ativada (j· vem true por padr„o)
-        rb.useGravity = true;
+        // DESLIGAMOS a gravidade padr√£o da Unity, porque ela √© igual para todo mundo.
+        // No lugar dela, aplicamos a NOSSA gravidade no FixedUpdate (com o multiplicador).
+        rb.useGravity = false;
 
-        // Garante que o Rigidbody N√O est· kinematic, ou seja, ele vai reagir ‡ fÌsica normalmente
-        // (isKinematic = false permite que a gravidade realmente puxe o objeto para baixo)
+        // Garante que o Rigidbody N√ÉO est√° kinematic, ou seja, ele vai reagir √† f√≠sica normalmente
         rb.isKinematic = false;
+    }
 
-        // A partir daqui, a plataforma passa a cair livremente por gravidade e continua caindo
+    // Roda a cada passo de f√≠sica (√© aqui que for√ßas devem ser aplicadas)
+    void FixedUpdate()
+    {
+        // Enquanto a plataforma ainda n√£o come√ßou a cair, n√£o faz nada
+        if (rb == null) return;
+
+        // Physics.gravity √© a gravidade do projeto (normalmente 0, -9.81, 0)
+        // Multiplicando, deixamos ela mais forte ou mais fraca S√ì nesta plataforma.
+        // ForceMode.Acceleration ignora a massa: plataforma leve ou pesada cai do mesmo jeito.
+        rb.AddForce(Physics.gravity * multiplicadorGravidade, ForceMode.Acceleration);
     }
 }
