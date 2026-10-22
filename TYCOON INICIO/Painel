@@ -1,0 +1,25 @@
+-- ========================================
+-- SCRIPT: PAINEL DO ARMAZÉM
+-- Mostra quanto dinheiro está no armazém da base
+-- Local: Tycoons.TycoonX.PainelArmazem
+-- ========================================
+
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- a peça do painel, a base e o texto da placa
+local painel = script.Parent
+local tycoon = Economia.acharTycoon(painel)
+local texto = painel:WaitForChild("SurfaceGui"):WaitForChild("TextLabel")
+
+-- ========================================
+-- CONFIGURAÇÕES DO PAINEL
+-- ========================================
+local intervaloAtualizacao = 0.5  -- segundos entre cada atualização
+local prefixo = "Armazém: $"      -- texto antes do número
+
+-- atualiza o texto para sempre
+while true do
+	texto.Text = prefixo .. Economia.pegarArmazem(tycoon)
+	task.wait(intervaloAtualizacao)
+end
