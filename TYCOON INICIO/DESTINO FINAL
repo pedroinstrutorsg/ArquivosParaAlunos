@@ -1,41 +1,35 @@
 -- ========================================
 -- SCRIPT: DESTINO FINAL
--- Quando um bloco encosta aqui, espera um pouco,
--- o bloco some e o valor vai pro armazém
+-- Vende o bloco que encosta aqui e manda o valor para o armazém da base
 -- Local: dentro da peça DestinoFinal
 -- ========================================
 
--- pega o módulo Economia (o mesmo do Coletor e do painel)
 local ServerScriptService = game:GetService("ServerScriptService")
 local Economia = require(ServerScriptService.Economia)
 
+-- a peça do destino e a base onde ele está
 local destino = script.Parent
+local tycoon = Economia.acharTycoon(destino)
 
 -- ========================================
 -- CONFIGURAÇÕES DO DESTINO
 -- ========================================
-local tempoAteSumir = 1  -- segundos entre o bloco tocar e ser destruído
+local tempoAteSumir = 1  -- segundos entre o bloco tocar e sumir
 
--- ========================================
--- EVENTO: dispara toda vez que algo toca no destino
--- ========================================
+-- vende o bloco que encostou
 destino.Touched:Connect(function(hit)
-	-- lê a "etiqueta de preço" que o script Bloco colocou
 	local valor = hit:GetAttribute("Valor")
-
-	-- se não tem etiqueta, não é um bloco (pode ser o jogador): ignora
 	if not valor then return end
 
-	-- tira a etiqueta NA HORA, para o bloco não ser vendido 2x
-	-- enquanto ele ainda está encostado esperando o tempo passar
+	-- tira a etiqueta para o bloco não ser vendido 2x
 	hit:SetAttribute("Valor", nil)
 
-	-- espera antes de destruir
-	-- (só este bloco espera; os outros continuam sendo vendidos normalmente)
 	task.wait(tempoAteSumir)
+	hit:Destroy()
 
-	hit:Destroy() -- o bloco some
-	Economia.adicionarAoArmazem(valor) -- o dinheiro vai pro armazém
-
-	print("Bloco vendido por " .. valor .. "! Armazém: " .. Economia.armazem)
+	-- só guarda o dinheiro se a base ainda tiver dono
+	if tycoon:GetAttribute("Dono") then
+		Economia.adicionarAoArmazem(tycoon, valor)
+		print("Bloco vendido por " .. valor .. "! Armazém: " .. Economia.pegarArmazem(tycoon))
+	end
 end)
