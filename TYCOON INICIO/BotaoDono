@@ -1,0 +1,69 @@
+-- ========================================
+-- SCRIPT: BOTÃO DONO
+-- Dá a base para o primeiro jogador que tocar
+-- e libera a base de novo quando o dono sai do jogo
+-- Local: Tycoons.TycoonX.BotaoDono
+-- ========================================
+
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- a peça do botão e a base onde ele está
+local botaoDono = script.Parent
+local tycoon = Economia.acharTycoon(botaoDono)
+
+-- texto da placa do botão
+local texto = botaoDono:FindFirstChildWhichIsA("TextLabel", true)
+
+-- ========================================
+-- CONFIGURAÇÕES
+-- ========================================
+local textoLivre = "Base livre"  -- texto quando a base não tem dono
+local textoDono = "Base de "     -- texto antes do nome do dono
+
+-- escreve na placa o nome do dono, ou "Base livre"
+local function atualizarPlaca(jogador)
+	if not texto then return end
+	if jogador then
+		texto.Text = textoDono .. jogador.Name
+	else
+		texto.Text = textoLivre
+	end
+end
+
+-- dá a base para o jogador que tocou
+botaoDono.Touched:Connect(function(hit)
+	if tycoon:GetAttribute("Dono") then return end
+
+	local jogador = Players:GetPlayerFromCharacter(hit.Parent)
+	if not jogador then return end
+
+	-- cada jogador só pode ter uma base
+	if Economia.tycoonDoJogador(jogador) then return end
+
+	tycoon:SetAttribute("Dono", jogador.UserId)
+	Economia.esvaziarArmazem(tycoon)
+	atualizarPlaca(jogador)
+
+	-- avisa os botões do térreo que podem aparecer
+	botaoDono:SetAttribute("Comprado", true)
+
+	print(jogador.Name .. " pegou a base " .. tycoon.Name)
+end)
+
+-- libera a base quando o dono sai
+Players.PlayerRemoving:Connect(function(jogador)
+	if tycoon:GetAttribute("Dono") ~= jogador.UserId then return end
+
+	tycoon:SetAttribute("Dono", nil)
+	Economia.esvaziarArmazem(tycoon)
+	atualizarPlaca(nil)
+
+	-- avisa os botões que a base resetou
+	botaoDono:SetAttribute("Comprado", nil)
+
+	print("A base " .. tycoon.Name .. " ficou livre")
+end)
+
+atualizarPlaca(nil)
