@@ -1,38 +1,48 @@
--- Cria e mantém o "leaderstats.Dinheiro" de cada jogador
--- sincronizado com a carteira do módulo Economia.
+-- ========================================
+-- SCRIPT: ECONOMIA UI
+-- Mostra a carteira de cada jogador no leaderboard
+-- e apaga a carteira quando o jogador sai
 -- Local: ServerScriptService.EconomiaUI
+-- ========================================
 
 local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Economia = require(ServerScriptService.Economia)
 
--- toda vez que um jogador entra no jogo
-Players.PlayerAdded:Connect(function(jogador)
-	-- "leaderstats" é um nome especial: o Roblox reconhece essa pasta
-	-- e mostra automaticamente o que tiver dentro dela no leaderboard padrão
+-- cria o "leaderstats.Dinheiro" do jogador
+local function criarLeaderstats(jogador)
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
 	leaderstats.Parent = jogador
 
-	-- o valor numérico que vai representar o dinheiro na tela
 	local dinheiro = Instance.new("IntValue")
 	dinheiro.Name = "Dinheiro"
 	dinheiro.Value = Economia.carteiras[jogador.UserId] or 0
 	dinheiro.Parent = leaderstats
+end
+
+-- jogadores que entrarem daqui pra frente
+Players.PlayerAdded:Connect(criarLeaderstats)
+
+-- jogadores que entraram antes deste script começar
+for _, jogador in ipairs(Players:GetPlayers()) do
+	criarLeaderstats(jogador)
+end
+
+-- apaga a carteira de quem sai
+Players.PlayerRemoving:Connect(function(jogador)
+	Economia.carteiras[jogador.UserId] = nil
 end)
 
--- a cada meio segundo, atualiza o valor de leaderstats de todo mundo
--- com o que estiver guardado de verdade na carteira de cada jogador
+-- atualiza o dinheiro de todos a cada meio segundo
 while true do
 	task.wait(0.5)
 
 	for _, jogador in ipairs(Players:GetPlayers()) do
 		local leaderstats = jogador:FindFirstChild("leaderstats")
-		if leaderstats then
-			local dinheiro = leaderstats:FindFirstChild("Dinheiro")
-			if dinheiro then
-				dinheiro.Value = Economia.carteiras[jogador.UserId] or 0
-			end
+		local dinheiro = leaderstats and leaderstats:FindFirstChild("Dinheiro")
+		if dinheiro then
+			dinheiro.Value = Economia.carteiras[jogador.UserId] or 0
 		end
 	end
 end
