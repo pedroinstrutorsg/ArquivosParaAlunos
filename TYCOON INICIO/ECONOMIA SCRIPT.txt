@@ -1,48 +1,70 @@
 -- ========================================
 -- MODULE SCRIPT: ECONOMIA
--- Guarda as variáveis compartilhadas entre
--- o Gerador e o Coletor
+-- Guarda o armazém de cada base e a carteira de cada jogador
 -- ========================================
 
-local Economia = {} -- tabela que vai guardar tudo que os outros scripts podem usar
+local Economia = {}
 
--- quantidade de dinheiro esperando ser coletado
-Economia.armazem = 0
+-- dinheiro esperando coleta em cada base: armazens[tycoon] = valor
+Economia.armazens = {}
 
--- tabela que guarda a carteira de CADA jogador
--- formato: carteiras[UserId] = valor
+-- dinheiro de cada jogador: carteiras[UserId] = valor
 Economia.carteiras = {}
 
--- ========================================
--- FUNÇÃO: adiciona dinheiro ao armazém
--- (chamada pelo GeradorScript)
--- ========================================
-function Economia.adicionarAoArmazem(valor)
-	Economia.armazem = Economia.armazem + valor
+-- pasta que guarda todas as bases
+local pastaTycoons = workspace:WaitForChild("Tycoons")
+
+-- devolve a base onde o objeto está (ou nil se estiver fora de uma base)
+function Economia.acharTycoon(objeto)
+	local atual = objeto
+	while atual and atual.Parent ~= pastaTycoons do
+		atual = atual.Parent
+	end
+	return atual
 end
 
--- ========================================
--- FUNÇÃO: transfere o dinheiro do armazém
--- para a carteira do jogador que coletou
--- (chamada pelo ColetorScript)
--- ========================================
-function Economia.coletarParaJogador(jogador)
-	local valor = Economia.armazem -- pega tudo que está guardado
+-- diz se o jogador é o dono da base
+function Economia.ehDono(tycoon, jogador)
+	return tycoon ~= nil and tycoon:GetAttribute("Dono") == jogador.UserId
+end
 
-	if valor > 0 then -- só faz algo se tiver dinheiro pra coletar
-		local id = jogador.UserId -- identifica o jogador de forma única
+-- devolve a base do jogador (ou nil se ele não tiver base)
+function Economia.tycoonDoJogador(jogador)
+	for _, tycoon in ipairs(pastaTycoons:GetChildren()) do
+		if tycoon:GetAttribute("Dono") == jogador.UserId then
+			return tycoon
+		end
+	end
+	return nil
+end
 
-		-- se o jogador ainda não tem carteira, começa em 0
-		-- se já tem, soma o novo valor
+-- devolve quanto dinheiro está no armazém da base
+function Economia.pegarArmazem(tycoon)
+	return Economia.armazens[tycoon] or 0
+end
+
+-- soma dinheiro no armazém da base
+function Economia.adicionarAoArmazem(tycoon, valor)
+	Economia.armazens[tycoon] = Economia.pegarArmazem(tycoon) + valor
+end
+
+-- zera o armazém da base
+function Economia.esvaziarArmazem(tycoon)
+	Economia.armazens[tycoon] = 0
+end
+
+-- passa o dinheiro do armazém da base para a carteira do jogador
+-- devolve quanto foi coletado
+function Economia.coletarParaJogador(tycoon, jogador)
+	local valor = Economia.pegarArmazem(tycoon)
+
+	if valor > 0 then
+		local id = jogador.UserId
 		Economia.carteiras[id] = (Economia.carteiras[id] or 0) + valor
-
-		Economia.armazem = 0 -- esvazia o armazém depois de coletar
+		Economia.esvaziarArmazem(tycoon)
 	end
 
-	-- retorna o total atualizado da carteira desse jogador
-	return Economia.carteiras[jogador.UserId] or 0
+	return valor
 end
 
--- toda ModuleScript PRECISA retornar algo no final
--- é isso que o require() vai receber
 return Economia
