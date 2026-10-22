@@ -1,30 +1,30 @@
 -- ========================================
 -- SCRIPT: COLETOR
--- Detecta quando um jogador toca no objeto
--- e transfere o dinheiro do armazém pra carteira dele
+-- Passa o dinheiro do armazém da base para a carteira do dono
+-- Local: Tycoons.TycoonX.Coletor
 -- ========================================
 
--- pega o módulo Economia (mesma instância usada pelo Gerador)
+local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Economia = require(ServerScriptService.Economia)
 
--- a própria forma (Sphere) onde esse script está dentro
+-- a peça do coletor e a base onde ele está
 local parte = script.Parent
+local tycoon = Economia.acharTycoon(parte)
 
--- ========================================
--- EVENTO: dispara toda vez que algo toca na parte
--- ========================================
+-- coleta quando o dono toca
 parte.Touched:Connect(function(hit)
-	-- "hit" é a parte específica que tocou (ex: perna do boneco)
-	-- hit.Parent pega o modelo do personagem inteiro
+	local jogador = Players:GetPlayerFromCharacter(hit.Parent)
+	if not jogador then return end
 
-	local jogador = game.Players:GetPlayerFromCharacter(hit.Parent)
-	-- converte o personagem no objeto Player de verdade
-	-- se não for um jogador (ex: um NPC), retorna nil
+	-- só o dono da base coleta
+	if not Economia.ehDono(tycoon, jogador) then return end
 
-	if jogador then -- só continua se quem tocou for realmente um jogador
-		local total = Economia.coletarParaJogador(jogador)
+	local valor = Economia.coletarParaJogador(tycoon, jogador)
 
-		print(jogador.Name .. " coletou o dinheiro! Carteira agora: " .. total)
+	-- só avisa quando coletou alguma coisa
+	if valor > 0 then
+		local total = Economia.carteiras[jogador.UserId]
+		print(jogador.Name .. " coletou " .. valor .. "! Carteira agora: " .. total)
 	end
 end)
