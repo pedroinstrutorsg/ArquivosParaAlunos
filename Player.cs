@@ -149,10 +149,6 @@ public class Player : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>(); // Pega o Rigidbody que está no mesmo GameObject deste script
 
-        // Interpolação deixa o movimento visualmente mais suave (a física roda em passos fixos,
-        // a interpolação "preenche" os frames entre um passo e outro)
-        rb.interpolation = RigidbodyInterpolation.Interpolate;
-
         // Trava o cursor do mouse no centro da tela e o deixa invisível (padrão em jogos FPS/terceira pessoa)
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -450,9 +446,9 @@ public class Player : MonoBehaviour
     // Controla a rotação do personagem e da câmera com base no movimento do mouse
     void RotacionarComMouse()
     {
-        // Pega o quanto o mouse se moveu no eixo X (horizontal) e Y (vertical) desde o último frame
-        float mouseX = Input.GetAxis("Mouse X") * sensibilidadeMouse * Time.deltaTime;
-        float mouseY = Input.GetAxis("Mouse Y") * sensibilidadeMouse * Time.deltaTime;
+        // Quanto o mouse se moveu neste frame, já multiplicado pela sensibilidade
+        float mouseX = Input.GetAxis("Mouse X") * sensibilidadeMouse * 0.01f;
+        float mouseY = Input.GetAxis("Mouse Y") * sensibilidadeMouse * 0.01f;
 
         // Rotaciona o personagem inteiro no eixo Y (esquerda/direita)
         transform.Rotate(Vector3.up * mouseX);
