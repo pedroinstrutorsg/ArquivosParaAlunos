@@ -1,0 +1,37 @@
+-- Comando para trocar todos os botoes
+-- salve uma cópia do jogo (File → Save to File As)
+-- e feche todos os scripts abertos.
+-- Passo a passo:
+-- 1. Na aba Script, no menu de cima, clique em Command.
+-- 2. No Explorer, clique no Script do botão que já está certo.
+-- 3. Cole o código na barra de comando e aperte Enter.
+-- 4. Confira o resultado no Output (View → Output).
+
+
+
+local modelo = game:GetService("Selection"):Get()[1]
+local historico = game:GetService("ChangeHistoryService")
+local configs = {"preco", "nomeDoItem", "ancorarAoComprar", "alturaDoTexto", "tamanhoDoTexto", "distanciaDoTexto", "corDoTexto"}
+local total = 0
+if not modelo or not modelo:IsA("Script") then
+	warn("Selecione o Script do botão modelo no Explorer antes de rodar")
+	return
+end
+historico:SetWaypoint("Antes de trocar os scripts")
+for _, obj in ipairs(workspace:GetDescendants()) do
+	if obj:IsA("Script") and obj ~= modelo and obj.Parent and obj.Parent.Name == "Botao" and obj.Parent:IsA("BasePart") then
+		local novo = modelo.Source
+		for _, nome in ipairs(configs) do
+			local linhaVelha = obj.Source:match("\nlocal " .. nome .. " = [^\n]*")
+			if linhaVelha then
+				novo = novo:gsub("\nlocal " .. nome .. " = [^\n]*", function() return linhaVelha end, 1)
+			elseif nome == "nomeDoItem" then
+				warn("Sem nome, ficou \"Gerador\": " .. obj:GetFullName())
+			end
+		end
+		obj.Source = novo
+		total += 1
+	end
+end
+historico:SetWaypoint("Depois de trocar os scripts")
+print("Scripts trocados: " .. total)
