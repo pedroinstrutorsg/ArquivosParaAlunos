@@ -1,0 +1,117 @@
+-- ========================================
+-- SCRIPT: PORTA LASER
+-- A alavanca liga e desliga os lasers da pasta.
+-- Laser ligado mata quem não é o dono da base.
+-- Local: dentro da pasta PortaLaser
+-- IMPORTANTE: a alavanca precisa se chamar "Alavanca";
+-- qualquer outra peça da pasta é laser
+-- ========================================
+
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- pasta da porta, alavanca e base onde ela está
+local pasta = script.Parent
+local alavanca = pasta:WaitForChild("Alavanca")
+local tycoon = Economia.acharTycoon(pasta)
+
+-- ========================================
+-- CONFIGURAÇÕES DA PORTA
+-- ========================================
+local comecaLigado = false                      -- estado do laser quando o jogo começa
+local apenasDonoUsa = true                      -- só o dono da base usa a alavanca
+local corLigado = Color3.fromRGB(0, 255, 0)     -- cor da alavanca com o laser ligado
+local corDesligado = Color3.fromRGB(255, 0, 0)  -- cor da alavanca com o laser desligado
+local transparenciaLigado = 0.3                 -- transparência do laser ligado
+local transparenciaDesligado = 1                -- transparência do laser desligado
+local distanciaInteracao = 8                    -- distância para aparecer a tecla E
+
+-- ========================================
+-- VARIÁVEIS DE CONTROLE
+-- ========================================
+local ligado = false  -- estado atual do laser
+local lasers = {}     -- peças que são laser
+
+-- botão de interação da alavanca
+local prompt = alavanca:FindFirstChildWhichIsA("ProximityPrompt") or Instance.new("ProximityPrompt")
+prompt.ObjectText = "Porta laser"
+prompt.KeyboardKeyCode = Enum.KeyCode.E
+prompt.HoldDuration = 0
+prompt.MaxActivationDistance = distanciaInteracao
+prompt.RequiresLineOfSight = false
+prompt.Parent = alavanca
+
+-- ========================================
+-- FUNÇÕES
+-- ========================================
+
+-- diz se o jogador é o dono da base
+local function ehDono(jogador)
+	return tycoon ~= nil and Economia.ehDono(tycoon, jogador)
+end
+
+-- liga ou desliga o laser e muda a cor da alavanca
+local function definirEstado(novoEstado)
+	ligado = novoEstado
+
+	if ligado then
+		alavanca.Color = corLigado
+		prompt.ActionText = "Desligar laser"
+	else
+		alavanca.Color = corDesligado
+		prompt.ActionText = "Ligar laser"
+	end
+
+	for _, laser in ipairs(lasers) do
+		if ligado then
+			laser.Transparency = transparenciaLigado
+		else
+			laser.Transparency = transparenciaDesligado
+		end
+	end
+end
+
+-- mata quem encosta no laser ligado, menos o dono
+local function tocarLaser(hit)
+	if not ligado then return end
+
+	local personagem = hit.Parent
+	local humanoid = personagem and personagem:FindFirstChildOfClass("Humanoid")
+	if not humanoid or humanoid.Health <= 0 then return end
+
+	local jogador = Players:GetPlayerFromCharacter(personagem)
+	if jogador and ehDono(jogador) then return end
+
+	humanoid.Health = 0
+end
+
+-- ========================================
+-- QUANDO O JOGO COMEÇA
+-- ========================================
+
+-- toda peça da pasta que não é a alavanca vira laser
+for _, objeto in ipairs(pasta:GetDescendants()) do
+	if objeto:IsA("BasePart") and objeto ~= alavanca and not objeto:IsDescendantOf(alavanca) then
+		objeto.Anchored = true
+		objeto.CanCollide = false
+		objeto.CanTouch = true
+		objeto.Touched:Connect(tocarLaser)
+		table.insert(lasers, objeto)
+	end
+end
+
+-- liga ou desliga quando alguém aperta E na alavanca
+prompt.Triggered:Connect(function(jogador)
+	if apenasDonoUsa and tycoon and not ehDono(jogador) then return end
+	definirEstado(not ligado)
+end)
+
+-- volta ao estado inicial quando a base troca de dono
+if tycoon then
+	tycoon:GetAttributeChangedSignal("Dono"):Connect(function()
+		definirEstado(comecaLigado)
+	end)
+end
+
+definirEstado(comecaLigado)
