@@ -1,0 +1,145 @@
+-- ========================================
+-- SCRIPT: PLACA DO DONO
+-- Mostra quem é o dono da base e faz o dono
+-- renascer na frente da placa quando morrer
+-- Local: Tycoons.TycoonX.PlacaDono
+-- ========================================
+
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- a placa e a base onde ela está
+local placa = script.Parent
+local tycoon = Economia.acharTycoon(placa)
+
+-- ========================================
+-- CONFIGURAÇÕES DO TEXTO
+-- ========================================
+local textoLivre = "Base livre"                     -- texto quando a base não tem dono
+local textoDono = "Base de"                         -- texto antes do nome do dono
+local quebrarLinha = true                           -- true: nome do dono na linha de baixo
+local usarApelido = false                           -- true: mostra o apelido (DisplayName) em vez do nome
+local tamanhoDoTexto = 0                            -- tamanho do texto (0 = automático, ocupa a placa toda)
+local fonte = Enum.Font.GothamBold                  -- fonte do texto
+local corDoTexto = Color3.fromRGB(255, 255, 255)    -- cor do texto
+local mostrarContorno = true                        -- true: contorno em volta das letras
+local corDoContorno = Color3.fromRGB(0, 0, 0)       -- cor do contorno
+local corDoFundo = Color3.fromRGB(0, 0, 0)          -- cor do fundo do texto
+local transparenciaDoFundo = 1                      -- fundo (0 = sólido, 1 = sem fundo)
+local ladoDoTexto = Enum.NormalId.Front             -- lado da placa onde fica o texto
+
+-- ========================================
+-- CONFIGURAÇÕES DO RENASCIMENTO
+-- ========================================
+local renascerNaPlaca = true   -- true: o dono renasce na frente da placa
+local distanciaRenascer = 5    -- distância da placa onde o dono renasce
+local alturaRenascer = 3       -- altura do renascimento em relação ao centro da placa
+
+-- ========================================
+-- VARIÁVEIS DE CONTROLE
+-- ========================================
+local conexaoRenascer = nil  -- ligação com o renascimento do dono atual
+local texto = nil            -- texto da placa
+
+-- ========================================
+-- FUNÇÕES
+-- ========================================
+
+-- cria o texto da placa com as configurações
+local function criarTexto()
+	local tela = Instance.new("SurfaceGui")
+	tela.Name = "TextoPlaca"
+	tela.Face = ladoDoTexto
+	tela.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	tela.Parent = placa
+
+	texto = Instance.new("TextLabel")
+	texto.Size = UDim2.new(1, 0, 1, 0)
+	texto.Font = fonte
+	texto.TextColor3 = corDoTexto
+	texto.TextWrapped = true
+	texto.BackgroundColor3 = corDoFundo
+	texto.BackgroundTransparency = transparenciaDoFundo
+	texto.TextStrokeColor3 = corDoContorno
+
+	if mostrarContorno then
+		texto.TextStrokeTransparency = 0
+	else
+		texto.TextStrokeTransparency = 1
+	end
+
+	if tamanhoDoTexto == 0 then
+		texto.TextScaled = true
+	else
+		texto.TextScaled = false
+		texto.TextSize = tamanhoDoTexto
+	end
+
+	texto.Parent = tela
+end
+
+-- devolve o nome do dono do jeito escolhido
+local function nomeDoJogador(jogador)
+	if usarApelido then
+		return jogador.DisplayName
+	end
+	return jogador.Name
+end
+
+-- leva o personagem para a frente do lado do texto
+local function levarParaPlaca(personagem)
+	personagem:WaitForChild("HumanoidRootPart")
+	task.wait(0.1)
+
+	local direcao = placa.CFrame:VectorToWorldSpace(Vector3.FromNormalId(ladoDoTexto))
+	local posicao = placa.Position + direcao * distanciaRenascer + Vector3.new(0, alturaRenascer, 0)
+	local olhar = Vector3.new(direcao.X, 0, direcao.Z)
+
+	if olhar.Magnitude > 0 then
+		personagem:PivotTo(CFrame.lookAt(posicao, posicao + olhar))
+	else
+		personagem:PivotTo(CFrame.new(posicao))
+	end
+end
+
+-- atualiza o texto e o renascimento quando o dono muda
+local function atualizarDono()
+	if conexaoRenascer then
+		conexaoRenascer:Disconnect()
+		conexaoRenascer = nil
+	end
+
+	local id = tycoon:GetAttribute("Dono")
+	local dono = id and Players:GetPlayerByUserId(id)
+
+	if dono then
+		local separador = " "
+		if quebrarLinha then
+			separador = "\n"
+		end
+		texto.Text = textoDono .. separador .. nomeDoJogador(dono)
+
+		if renascerNaPlaca then
+			conexaoRenascer = dono.CharacterAdded:Connect(levarParaPlaca)
+		end
+	else
+		texto.Text = textoLivre
+	end
+end
+
+-- ========================================
+-- QUANDO O JOGO COMEÇA
+-- ========================================
+
+-- apaga textos antigos da placa e cria o novo
+for _, objeto in ipairs(placa:GetChildren()) do
+	if objeto:IsA("SurfaceGui") or objeto:IsA("BillboardGui") then
+		objeto:Destroy()
+	end
+end
+criarTexto()
+
+tycoon:GetAttributeChangedSignal("Dono"):Connect(atualizarDono)
+atualizarDono()
+
