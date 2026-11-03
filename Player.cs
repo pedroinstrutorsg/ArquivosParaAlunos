@@ -1,72 +1,67 @@
 using UnityEngine;
 
-// Estados possíveis do movimento do player
+// Estados do movimento do player
 public enum EstadoMovimento
 {
     Parado,
     Andando,
     Correndo,
-    Deslizando   // soltou as teclas, mas ainda está freando (escorregando)
+    Deslizando   // soltou as teclas, mas ainda está freando
 }
 
 public class Player : MonoBehaviour
 {
     [Header("Andar / Correr")]
-    [Tooltip("Velocidade enquanto o player está andando (unidades por segundo)")]
+    [Tooltip("Velocidade ao andar")]
     public float velocidadeAndar = 5f;
 
-    [Tooltip("Velocidade quando o player entra no estado de corrida")]
+    [Tooltip("Velocidade ao correr")]
     public float velocidadeCorrer = 9f;
 
-    [Tooltip("Tempo (em segundos) andando sem parar até virar corrida. 0 = corre na hora")]
+    [Tooltip("Segundos andando até começar a correr. 0 = corre na hora")]
     public float tempoParaCorrer = 1.5f;
 
-    [Tooltip("Ligado: a velocidade vai subindo aos poucos enquanto anda até virar corrida.\nDesligado: anda na velocidade normal e muda de uma vez para a de corrida.")]
+    [Tooltip("Ligado: a velocidade sobe aos poucos até a de correr.\nDesligado: troca de uma vez.")]
     public bool aumentoGradual = true;
 
-    [Tooltip("Formato da aceleração quando o Aumento Gradual está ligado.\n1 = sobe por igual (linear)\nMaior que 1 = começa devagar e acelera no final (ex: 2)\nMenor que 1 = acelera rápido no começo e suaviza no final (ex: 0.5)")]
+    [Tooltip("Formato da subida de velocidade.\n1 = sobe por igual\nMaior que 1 = começa devagar\nMenor que 1 = começa rápido")]
     [Min(0.1f)]
     public float curvaAceleracao = 1f;
 
-    [Tooltip("Ligado: só acumula tempo de corrida enquanto segura a tecla de correr.\nDesligado: basta andar sem parar.")]
+    [Tooltip("Ligado: só corre segurando a tecla de correr.")]
     public bool exigirTeclaCorrer = false;
 
-    public KeyCode teclaCorrer = KeyCode.LeftShift;
+    public KeyCode teclaCorrer = KeyCode.LeftShift; // tecla de correr
 
-    // ========================================
-    // ACELERAÇÃO E FRENAGEM (substitui o antigo "deslizamento")
-    // Em vez de um número de 0 a 1, usamos TEMPOS em segundos:
-    // é mais fácil de entender e o player nunca fica travado.
-    // ========================================
     [Header("Aceleração e Frenagem")]
-    [Tooltip("Segundos para sair do parado e chegar na velocidade de andar.\n0 = arranca na hora\n0.1 = ágil (padrão de plataforma)\n0.5 ou mais = pesado")]
+    [Tooltip("Segundos para sair do parado até a velocidade de andar. 0 = arranca na hora")]
     [Min(0f)]
     public float tempoAcelerar = 0.1f;
 
-    [Tooltip("Segundos para frear da velocidade de andar até parar.\n0 = para na hora\n0.1 = suave\n1 ou mais = parece gelo")]
+    [Tooltip("Segundos para frear até parar. 0 = para na hora, 1 ou mais = parece gelo")]
     [Min(0f)]
     public float tempoFrear = 0.1f;
 
-    [Tooltip("Quanto o jogador consegue mudar a direção no ar.\n0 = nenhum controle (mantém o embalo do pulo)\n0.5 = metade do controle do chão\n1 = igual ao chão")]
+    [Tooltip("Controle da direção no ar. 0 = nenhum, 1 = igual ao chão")]
     [Range(0f, 1f)]
     public float controleNoAr = 0.5f;
 
-    private EstadoMovimento estadoAtual = EstadoMovimento.Parado; // estado atual do movimento
-    private float velocidadeAtual = 0f;                           // velocidade que o player QUER ter agora
+    private EstadoMovimento estadoAtual = EstadoMovimento.Parado; // estado do movimento agora
+    private float velocidadeAtual = 0f;                           // velocidade que o player quer ter
 
-    public EstadoMovimento EstadoAtual => estadoAtual; // outros scripts (ex: animação) podem ler o estado
+    // ===== Informações para outros scripts =====
+    public EstadoMovimento EstadoAtual => estadoAtual; // estado do movimento
 
-    // ===== Informações para outros scripts (ex: UI de debug) =====
-    // Velocidade REAL no chão (X e Z), já contando a aceleração e a frenagem
+    // Velocidade real no chão (X e Z)
     public float VelocidadeAtual => rb != null ? new Vector3(rb.velocity.x, 0f, rb.velocity.z).magnitude : 0f;
-    public bool EstaNoChao => contatosNoChao > 0;
 
-    // Quantos pulos o player consegue dar AGORA
+    public bool EstaNoChao => contatosNoChao > 0; // true se está tocando o chão
+
+    // Quantos pulos o player pode dar agora
     public int PulosDisponiveis
     {
         get
         {
-            // No chão ou dentro do coyote time (sem ter pulado): tem todos os pulos
             bool podePularDoChao = (Time.time - ultimoTempoNoChao <= tempoCoyote) && !pulouDoChao;
             return podePularDoChao ? pulosMaximos : pulosNoAr;
         }
@@ -77,43 +72,39 @@ public class Player : MonoBehaviour
     {
         get
         {
-            if (EstaNoChao) return tempoCoyote;   // no chão: janela cheia
-            if (pulouDoChao) return 0f;           // já pulou: coyote não vale mais
+            if (EstaNoChao) return tempoCoyote;
+            if (pulouDoChao) return 0f;
             return Mathf.Max(0f, tempoCoyote - (Time.time - ultimoTempoNoChao));
         }
     }
 
     [Header("Pulo")]
-    public float forcaPulo = 6f;       // Força aplicada verticalmente ao pular
+    public float forcaPulo = 6f; // força do pulo
 
     [Min(0)]
-    [Tooltip("0 = não pula, 1 = pulo normal (padrão), 2 = pulo duplo, 3 = pulo triplo...")]
+    [Tooltip("Quantidade de pulos. 0 = não pula, 1 = normal, 2 = duplo...")]
     public int pulosMaximos = 1;
 
-    [Tooltip("Coyote time: tempo (em segundos) que o player ainda pode dar o pulo do chão depois de sair de uma borda")]
+    [Tooltip("Segundos em que ainda dá para pular depois de sair de uma borda")]
     public float tempoCoyote = 0.15f;
 
-    [Tooltip("Ligado: depois de pular pelo coyote time, ainda pode usar os pulos de ar (ex: pulo duplo).\nDesligado: o pulo do coyote é o ÚNICO pulo até encostar no chão de novo.")]
+    [Tooltip("Ligado: depois do pulo de coyote, ainda pode usar os pulos no ar.")]
     public bool coyotePermitePulosExtras = true;
 
-    [Tooltip("Tempo mínimo (em segundos) entre um pulo e outro.\n0 = pode pular de novo na hora\n0.2 = evita pulos duplos sem querer (padrão)\n0.5 ou mais = pulo duplo bem lento")]
+    [Tooltip("Tempo mínimo entre um pulo e outro")]
     [Min(0f)]
     public float cooldownEntrePulos = 0.2f;
 
-    // Quanto tempo falta para poder pular de novo (útil para UI de debug)
+    // Quanto tempo falta para poder pular de novo
     public float CooldownPuloRestante => Mathf.Max(0f, cooldownEntrePulos - (Time.time - tempoUltimoPulo));
 
     [Header("Rotação do Mouse")]
-    public float sensibilidadeMouse = 200f;   // Quanto o mouse influencia a rotação (quanto maior, mais sensível)
-    public Transform cameraPersonagem;        // Referência da câmera (deve ser filha do personagem na Hierarchy)
-    public float limiteAnguloVertical = 80f;  // Limite máximo de ângulo para olhar pra cima/baixo (evita giro de 360°)
+    public float sensibilidadeMouse = 200f;   // velocidade do giro com o mouse
+    public Transform cameraPersonagem;        // câmera do player (filha do player)
+    public float limiteAnguloVertical = 80f;  // ângulo máximo para olhar para cima e para baixo
 
-    // ========================================
-    // VALORES DO CHECKPOINT
-    // Quando o player passa por um checkpoint novo, guardamos os valores dele.
-    // Quando ele volta para o checkpoint (a cena recarrega), recebe esses valores de volta.
-    // "static" = sobrevive ao reload da cena, igual ao CheckpointManager.
-    // ========================================
+    // ===== Valores guardados no checkpoint =====
+    // Guarda as configurações do player para devolver quando ele voltar ao checkpoint
     private class ValoresSalvos
     {
         public int pulosMaximos;
@@ -124,44 +115,56 @@ public class Player : MonoBehaviour
         public bool coyotePermitePulosExtras;
     }
 
-    private static ValoresSalvos valoresDoCheckpoint;   // os valores guardados
-    private static Vector3? checkpointDosValores;       // de qual checkpoint esses valores são
+    // "static" = não se perde quando a cena recarrega
+    private static ValoresSalvos valoresDoCheckpoint;   // valores guardados
+    private static Vector3? checkpointDosValores;       // checkpoint onde os valores foram guardados
 
-    private Rigidbody rb;              // Referência ao componente Rigidbody do personagem, usado para física e movimento
-    private float rotacaoVertical = 0f; // Guarda o ângulo vertical atual da câmera (acumulado a cada frame)
-    private int contatosNoChao = 0;    // Conta quantas plataformas o personagem está tocando ao mesmo tempo (usado para permitir o pulo)
+    private Rigidbody rb;               // física do player
+    private float rotacaoVertical = 0f; // ângulo atual da câmera para cima/baixo
+    private int contatosNoChao = 0;     // quantas plataformas o player está tocando
 
-    private int pulosNoAr = 0;                // quantos pulos ainda podem ser usados no ar
-    private float proximaTrocaPermitida = 0f; // momento (Time.time) a partir do qual pode trocar os pulos de novo
+    private int pulosNoAr = 0;                // pulos que ainda sobram no ar
+    private float proximaTrocaPermitida = 0f; // quando uma zona pode alterar o player de novo
 
-    private float ultimoTempoNoChao = -999f; // COYOTE: último momento em que o player estava tocando o chão
-    private bool pulouDoChao = false;        // COYOTE: impede usar o pulo do chão duas vezes
+    private float ultimoTempoNoChao = -999f; // último momento em que tocou o chão
+    private bool pulouDoChao = false;        // true depois do pulo do chão, até tocar o chão de novo
 
-    private float tempoUltimoPulo = -999f;   // COOLDOWN: momento (Time.time) do último pulo
+    private float tempoUltimoPulo = -999f;   // momento do último pulo
 
-    // Logo depois de pular, o pé ainda encosta no chão por alguns instantes.
-    // Durante esse tempo o chão NÃO recarrega os pulos (senão o pulo voltaria na hora).
+    // Tempo depois do pulo em que o chão é ignorado (o pé ainda encosta no chão)
     private const float tempoIgnorarChaoAposPulo = 0.1f;
 
-    private float tempoMovendo = 0f;         // CORRIDA: há quanto tempo o player está andando sem parar
+    private float tempoMovendo = 0f; // há quanto tempo o player está andando sem parar
 
+    private float rotacaoHorizontal = 0f; // giro do player para os lados, aplicado na física
+
+    // Converte o movimento do mouse em graus (sensibilidadeMouse 200 vira cerca de 4 graus por unidade)
+    private const float escalaDoMouse = 0.02f;
+
+    // Roda uma vez quando o jogo começa
     void Start()
     {
-        rb = GetComponent<Rigidbody>(); // Pega o Rigidbody que está no mesmo GameObject deste script
+        rb = GetComponent<Rigidbody>();
 
-        // Trava o cursor do mouse no centro da tela e o deixa invisível (padrão em jogos FPS/terceira pessoa)
+        // Deixa o movimento mais suave na tela
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
+
+        // Prende e esconde o cursor do mouse
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
-        // Se já existe um checkpoint salvo (sobrevive ao reload de cena),
-        // reposiciona o player nele em vez de nascer no ponto padrão da cena.
+        // Se tem checkpoint salvo, o player nasce nele
         if (CheckpointManager.posicaoCheckpoint.HasValue)
         {
             transform.position = CheckpointManager.posicaoCheckpoint.Value;
             transform.rotation = Quaternion.Euler(0f, CheckpointManager.rotacaoYCheckpoint, 0f);
         }
 
-        // CHECKPOINT: se está nascendo no checkpoint que tem valores guardados, recebe esses valores
+        // A física não gira o player; só o script gira
+        rb.freezeRotation = true;
+        rotacaoHorizontal = transform.eulerAngles.y;
+
+        // Se nasceu no checkpoint dos valores guardados, recebe esses valores
         if (CheckpointManager.posicaoCheckpoint.HasValue
             && valoresDoCheckpoint != null
             && checkpointDosValores == CheckpointManager.posicaoCheckpoint.Value)
@@ -170,61 +173,61 @@ public class Player : MonoBehaviour
         }
     }
 
+    // Roda a cada frame
     void Update()
     {
-        // Rotação é feita no Update porque o mouse é lido a cada frame renderizado (mais suave visualmente)
         RotacionarComMouse();
 
-        // CHECKPOINT: o CheckpointManager mudou de posição = o player passou por um checkpoint novo
+        // Passou por um checkpoint novo: guarda os valores
         if (CheckpointManager.posicaoCheckpoint.HasValue
             && checkpointDosValores != CheckpointManager.posicaoCheckpoint.Value)
         {
             SalvarValoresNoCheckpoint();
         }
 
-        // Acabou de pular? (o pé ainda pode estar encostando no chão)
+        // true logo depois de pular
         bool acabouDePular = Time.time - tempoUltimoPulo < tempoIgnorarChaoAposPulo;
 
-        // CHÃO: tocando o chão (e não no instante do pulo) recarrega tudo
+        // No chão: recarrega os pulos
         if (contatosNoChao > 0 && !acabouDePular)
         {
-            ultimoTempoNoChao = Time.time;              // COYOTE: último momento no chão
-            pulouDoChao = false;                        // libera o pulo do chão
-            pulosNoAr = Mathf.Max(0, pulosMaximos - 1); // recarrega os pulos de ar
+            ultimoTempoNoChao = Time.time;
+            pulouDoChao = false;
+            pulosNoAr = Mathf.Max(0, pulosMaximos - 1);
         }
 
-        // COYOTE: conta como "no chão" se está tocando o chão OU saiu dele há menos de tempoCoyote segundos
+        // Pode dar o pulo do chão: está no chão ou ainda dentro do coyote time
         bool podePularDoChao = (Time.time - ultimoTempoNoChao <= tempoCoyote) && !pulouDoChao;
 
-        // COOLDOWN: só pode pular se já passou o tempo mínimo desde o último pulo
+        // Já passou o tempo mínimo desde o último pulo
         bool cooldownLiberado = Time.time - tempoUltimoPulo >= cooldownEntrePulos;
 
         if (Input.GetKeyDown(KeyCode.Space) && cooldownLiberado)
         {
             if (podePularDoChao && pulosMaximos > 0)
             {
-                // Pulo do chão OU do coyote time: os dois gastam exatamente 1 pulo.
-                // Se não está tocando o chão, este é um pulo de coyote
+                // Pulo do chão (ou de coyote, se já saiu do chão)
                 bool puloDeCoyote = contatosNoChao == 0;
 
                 Pular();
 
                 if (puloDeCoyote && !coyotePermitePulosExtras)
-                    pulosNoAr = 0;                 // coyote sem extras: acabaram os pulos
+                    pulosNoAr = 0;                 // sem pulos extras
                 else
-                    pulosNoAr = pulosMaximos - 1;  // sobram (pulosMaximos - 1) para usar no ar
-                pulouDoChao = true;            // só volta a ser false quando encostar no chão de novo
-                ultimoTempoNoChao = -999f;     // fecha a janela do coyote na hora
+                    pulosNoAr = pulosMaximos - 1;  // pulos que sobram para o ar
+
+                pulouDoChao = true;
+                ultimoTempoNoChao = -999f;         // fecha o coyote time
             }
             else if (pulosNoAr > 0)
             {
-                // Pulo no ar (ex: segundo pulo do pulo duplo)
+                // Pulo no ar
                 Pular();
                 pulosNoAr--;
             }
         }
 
-        // Tecla de escape (ESC): libera o cursor do mouse
+        // ESC solta o cursor do mouse
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             Cursor.lockState = CursorLockMode.None;
@@ -232,40 +235,41 @@ public class Player : MonoBehaviour
         }
     }
 
+    // Roda em passos fixos, junto com a física
     void FixedUpdate()
     {
-        // Movimento é feito no FixedUpdate porque envolve física (Rigidbody)
+        // Gira o player pela física, sem brigar com a interpolação
+        rb.MoveRotation(Quaternion.Euler(0f, rotacaoHorizontal, 0f));
         MovimentarTeclas();
     }
 
-    // Aplica o pulo
+    // Faz o player pular
     void Pular()
     {
-        tempoUltimoPulo = Time.time; // COOLDOWN: guarda o momento do pulo
+        tempoUltimoPulo = Time.time;
 
-        // Zera a velocidade vertical antes de pular, assim o pulo duplo tem sempre a mesma altura
+        // Zera a velocidade de queda para todo pulo ter a mesma altura
         Vector3 v = rb.velocity;
         v.y = 0f;
         rb.velocity = v;
 
-        // Aplica uma força instantânea para cima (ForceMode.VelocityChange ignora a massa do objeto)
+        // Empurra o player para cima
         rb.AddForce(Vector3.up * forcaPulo, ForceMode.VelocityChange);
     }
 
-    // Chamado pela ZonaDePulo. Troca a quantidade de pulos se não estiver em cooldown.
-    // Retorna true se a troca aconteceu.
+    // Troca a quantidade de pulos (usado pela ZonaDePulo). Retorna true se trocou.
     public bool DefinirPulos(int quantidade, float cooldown)
     {
         if (Time.time < proximaTrocaPermitida)
             return false;
 
-        pulosMaximos = Mathf.Max(0, quantidade); // sem limite máximo, só não deixa ser negativo
-        pulosNoAr = pulosMaximos; // redefine os pulos na hora
+        pulosMaximos = Mathf.Max(0, quantidade);
+        pulosNoAr = pulosMaximos;
         proximaTrocaPermitida = Time.time + cooldown;
         return true;
     }
 
-    // Guarda os valores ATUAIS do player (chamado sozinho ao passar por um checkpoint novo)
+    // Guarda os valores atuais do player no checkpoint
     public void SalvarValoresNoCheckpoint()
     {
         valoresDoCheckpoint = new ValoresSalvos
@@ -288,8 +292,7 @@ public class Player : MonoBehaviour
         Debug.Log("Checkpoint: valores do player salvos (" + pulosMaximos + " pulo(s))");
     }
 
-    // Devolve ao player os valores guardados no checkpoint.
-    // Público: se algum script seu levar o player ao checkpoint SEM recarregar a cena, chame este método.
+    // Devolve ao player os valores guardados no checkpoint
     public void RestaurarValoresDoCheckpoint()
     {
         if (valoresDoCheckpoint == null) return;
@@ -307,112 +310,95 @@ public class Player : MonoBehaviour
         cooldownEntrePulos = valoresDoCheckpoint.cooldownEntrePulos;
         coyotePermitePulosExtras = valoresDoCheckpoint.coyotePermitePulosExtras;
 
-        // Recarrega os pulos de ar com a quantidade restaurada
         pulosNoAr = Mathf.Max(0, pulosMaximos - 1);
     }
 
-    // ===== Usado pela ZonaDePulo para alterar QUALQUER variável =====
-    // true enquanto o player ainda não pode ser alterado por outra zona
+    // ===== Usado pela ZonaDePulo =====
+    // true enquanto nenhuma zona pode alterar o player
     public bool EmCooldownDeTroca => Time.time < proximaTrocaPermitida;
 
-    // Começa a contar o cooldown (nenhuma zona altera o player até ele acabar)
+    // Começa o tempo de espera entre uma zona e outra
     public void IniciarCooldownDeTroca(float cooldown)
     {
         proximaTrocaPermitida = Time.time + cooldown;
     }
 
-    // Transforma um TEMPO (segundos) em ACELERAÇÃO (quanto a velocidade muda por segundo)
-    // Ex: andar a 5 u/s e tempo 0.1s -> a velocidade muda 50 u/s a cada segundo
+    // Transforma um tempo em segundos em aceleração (quanto a velocidade muda por segundo)
     float TempoParaAceleracao(float tempo)
     {
         if (tempo <= 0f)
-            return 1000f; // tempo zero = muda praticamente na hora (em 1 passo de física)
+            return 1000f; // muda na hora
 
         return velocidadeAndar / tempo;
     }
 
-    // Lê as teclas WASD e movimenta o personagem com base na direção que ele está olhando
+    // Move o player com as teclas WASD
     void MovimentarTeclas()
     {
-        Vector3 direcao = Vector3.zero; // Vetor que vai acumular a direção do movimento
+        Vector3 direcao = Vector3.zero; // direção apertada nas teclas
 
-        // transform.forward/right são baseados na rotação atual do personagem,
-        // ou seja, "frente" sempre é para onde ele está olhando
         if (Input.GetKey(KeyCode.W))
-            direcao += transform.forward;  // Anda para frente
+            direcao += transform.forward;  // frente
         if (Input.GetKey(KeyCode.S))
-            direcao -= transform.forward;  // Anda para trás
+            direcao -= transform.forward;  // trás
         if (Input.GetKey(KeyCode.A))
-            direcao -= transform.right;    // Anda para a esquerda
+            direcao -= transform.right;    // esquerda
         if (Input.GetKey(KeyCode.D))
-            direcao += transform.right;    // Anda para a direita
+            direcao += transform.right;    // direita
 
-        bool estaMovendo = direcao != Vector3.zero;
+        bool estaMovendo = direcao != Vector3.zero; // true se alguma tecla está apertada
 
-        // Descobre a velocidade de acordo com o estado (parado / andando / correndo)
         AtualizarEstado(estaMovendo);
 
-        // Normalized garante que andar na diagonal (ex: W+D) não seja mais rápido que andar reto
-        // Essa é a velocidade que o player QUER ter (o "alvo")
+        // Velocidade que o player quer ter (normalized: a diagonal não fica mais rápida)
         Vector3 alvo = direcao.normalized * velocidadeAtual;
 
-        // Velocidade horizontal que o player TEM agora (sem o Y, que é queda/pulo)
+        // Velocidade que o player tem agora, sem a queda (Y)
         Vector3 atual = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
 
-        // ========================================
-        // ESCOLHE A ACELERAÇÃO DESTE PASSO
-        // ========================================
-        float aceleracao;
+        float aceleracao; // quanto a velocidade pode mudar por segundo
 
         if (!estaMovendo)
         {
-            // Soltou as teclas: está freando
+            // Sem teclas: freando
             aceleracao = TempoParaAceleracao(tempoFrear);
         }
         else if (Vector3.Dot(atual, alvo) < 0f)
         {
-            // Virou para o lado oposto (ex: andava pra frente e apertou S):
-            // usa a mais forte entre acelerar e frear, para a virada ser rápida
+            // Virou para o lado contrário: usa a mais forte para virar rápido
             aceleracao = Mathf.Max(TempoParaAceleracao(tempoAcelerar), TempoParaAceleracao(tempoFrear));
         }
         else
         {
-            // Andando normalmente: acelerando até o alvo
+            // Andando: acelerando
             aceleracao = TempoParaAceleracao(tempoAcelerar);
         }
 
-        // No ar o jogador tem menos controle (mantém mais o embalo do pulo)
+        // No ar tem menos controle
         if (!EstaNoChao)
             aceleracao *= controleNoAr;
 
-        // ========================================
-        // APROXIMA A VELOCIDADE DO ALVO
-        // MoveTowards anda uma quantidade FIXA por passo (aceleração x tempo).
-        // Diferente do Lerp, ela sempre chega exatamente no alvo e nunca "trava" no caminho.
-        // ========================================
+        // Chega um pouco mais perto da velocidade alvo
         Vector3 novaVelocidade = Vector3.MoveTowards(atual, alvo, aceleracao * Time.fixedDeltaTime);
 
-        // Mantém a velocidade vertical atual (queda/pulo) e só altera o movimento horizontal (X e Z)
+        // Mantém a velocidade de queda/pulo
         novaVelocidade.y = rb.velocity.y;
 
-        // Aplica a velocidade final diretamente no Rigidbody
         rb.velocity = novaVelocidade;
     }
 
-    // CORRIDA: decide o estado atual e a velocidade que deve ser usada
+    // Decide o estado (parado, andando, correndo, deslizando) e a velocidade
     void AtualizarEstado(bool estaMovendo)
     {
-        // Se exigir a tecla de correr e ela não estiver pressionada, não acumula tempo de corrida
+        // true se pode contar o tempo de corrida
         bool podeAcumularCorrida = !exigirTeclaCorrer || Input.GetKey(teclaCorrer);
 
         if (!estaMovendo)
         {
-            // Soltou as teclas: zera o tempo de corrida e o alvo de velocidade
             tempoMovendo = 0f;
             velocidadeAtual = 0f;
 
-            // DESLIZANDO: sem teclas, mas o corpo ainda está se mexendo no chão (X e Z)
-            // Abaixo de 0.1 já conta como parado
+            // Ainda se mexendo sem teclas = deslizando
             if (VelocidadeAtual > 0.1f)
                 estadoAtual = EstadoMovimento.Deslizando;
             else
@@ -421,70 +407,66 @@ public class Player : MonoBehaviour
         }
 
         if (podeAcumularCorrida)
-            tempoMovendo += Time.fixedDeltaTime; // continua andando: soma o tempo
+            tempoMovendo += Time.fixedDeltaTime; // soma o tempo andando
         else
-            tempoMovendo = 0f;                   // soltou a tecla de correr: volta a andar
+            tempoMovendo = 0f;
 
-        // Progresso de 0 (acabou de começar a andar) até 1 (virou corrida)
+        // Vai de 0 (começou a andar) até 1 (correndo)
         float progresso = tempoParaCorrer <= 0f ? 1f : Mathf.Clamp01(tempoMovendo / tempoParaCorrer);
 
         if (aumentoGradual)
         {
-            // Velocidade sobe aos poucos; elevar o progresso à curva muda o "formato" da subida
+            // Velocidade sobe aos poucos, seguindo a curva
             float t = Mathf.Pow(progresso, curvaAceleracao);
             velocidadeAtual = Mathf.Lerp(velocidadeAndar, velocidadeCorrer, t);
         }
         else
         {
-            // Anda na velocidade normal e só troca quando o tempo completa
+            // Troca de uma vez quando o tempo completa
             velocidadeAtual = progresso >= 1f ? velocidadeCorrer : velocidadeAndar;
         }
 
         estadoAtual = progresso >= 1f ? EstadoMovimento.Correndo : EstadoMovimento.Andando;
     }
 
-    // Controla a rotação do personagem e da câmera com base no movimento do mouse
+    // Gira o player e a câmera com o mouse
     void RotacionarComMouse()
     {
-        // Quanto o mouse se moveu neste frame, já multiplicado pela sensibilidade
-        float mouseX = Input.GetAxis("Mouse X") * sensibilidadeMouse * 0.01f;
-        float mouseY = Input.GetAxis("Mouse Y") * sensibilidadeMouse * 0.01f;
+        // Quanto o mouse andou neste frame (sem suavização e sem depender do FPS)
+        float mouseX = Input.GetAxisRaw("Mouse X") * sensibilidadeMouse * escalaDoMouse;
+        float mouseY = Input.GetAxisRaw("Mouse Y") * sensibilidadeMouse * escalaDoMouse;
 
-        // Rotaciona o personagem inteiro no eixo Y (esquerda/direita)
-        transform.Rotate(Vector3.up * mouseX);
+        // Guarda o giro para os lados; o FixedUpdate aplica
+        rotacaoHorizontal += mouseX;
 
-        // Só mexe na rotação vertical se a câmera estiver configurada no Inspector
         if (cameraPersonagem != null)
         {
-            // Subtrai o mouseY: mover o mouse pra cima deve olhar pra cima (rotação negativa no eixo X)
+            // Mouse para cima = olhar para cima
             rotacaoVertical -= mouseY;
 
-            // Limita o ângulo vertical para não deixar o personagem "olhar de cabeça para baixo"
+            // Limita o quanto dá para olhar para cima e para baixo
             rotacaoVertical = Mathf.Clamp(rotacaoVertical, -limiteAnguloVertical, limiteAnguloVertical);
 
-            // Aplica a rotação SOMENTE na câmera (localRotation), não no personagem inteiro
+            // Gira só a câmera para cima e para baixo
             cameraPersonagem.localRotation = Quaternion.Euler(rotacaoVertical, 0f, 0f);
         }
     }
 
-    // Chamado automaticamente pela Unity quando o Collider deste objeto ENCOSTA em outro
+    // Chamado quando o player encosta em algo
     void OnCollisionEnter(Collision colisao)
     {
         if (colisao.gameObject.CompareTag("Plataforma"))
         {
-            contatosNoChao++; // Soma 1 contato: cada plataforma tocada conta separadamente
-            // A recarga dos pulos agora acontece no Update (veja "CHÃO")
+            contatosNoChao++; // mais uma plataforma tocando
         }
     }
 
-    // Chamado automaticamente pela Unity quando o Collider deste objeto não está tocando no outro
+    // Chamado quando o player deixa de encostar em algo
     void OnCollisionExit(Collision colisao)
     {
         if (colisao.gameObject.CompareTag("Plataforma"))
         {
-            // Remove esse contato; o pulo só é bloqueado quando o contador chegar a 0
-            // (Max evita ficar negativo depois de morrer e ser teletransportado)
-            contatosNoChao = Mathf.Max(0, contatosNoChao - 1);
+            contatosNoChao = Mathf.Max(0, contatosNoChao - 1); // uma plataforma a menos (nunca negativo)
         }
     }
 }
