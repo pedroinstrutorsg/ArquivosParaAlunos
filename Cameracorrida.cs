@@ -1,35 +1,33 @@
 using UnityEngine;
 
-
-// Ela reage ao movimento do player:
-//   - balanÁa um pouco a cada passo (como a cabeÁa de quem anda)
-//   - abre o campo de vis„o (FOV) quando corre, dando sensaÁ„o de velocidade
-//   - treme levemente enquanto corre
+// Efeitos da c√¢mera do player: balan√ßo dos passos, FOV na corrida e tremor leve.
+// S√≥ mexe na posi√ß√£o local, no FOV e soma um tremor pequeno. N√£o l√™ o mouse.
+[DefaultExecutionOrder(100)]
 [RequireComponent(typeof(Camera))]
 public class CameraCorrida : MonoBehaviour
 {
-    [Tooltip("O Player. Se ficar vazio, procura sozinho nos \"pais\" da c‚mera")]
+    [Tooltip("O Player. Se ficar vazio, procura sozinho nos pais da c√¢mera")]
     public Player player;
 
-    [Header("BalanÁo dos Passos")]
+    [Header("Balan√ßo dos Passos")]
     public bool ativarBalanco = true;
 
-    [Tooltip("Quanto a c‚mera sobe e desce a cada passo")]
+    [Tooltip("Quanto a c√¢mera sobe e desce a cada passo")]
     public float alturaBalanco = 0.05f;
 
-    [Tooltip("Quanto a c‚mera vai para os lados a cada passo")]
-    public float larguraBalanco = 0.03f;
+    [Tooltip("Quanto a c√¢mera vai para os lados a cada passo. 0 = sem balan√ßo lateral")]
+    public float larguraBalanco = 0.02f;
 
-    [Tooltip("Passos por segundo andando. Correndo fica mais r·pido sozinho")]
+    [Tooltip("Passos por segundo andando. Correndo fica mais r√°pido sozinho")]
     public float passosPorSegundo = 1.8f;
 
-    [Header("Campo de Vis„o (FOV)")]
+    [Header("Campo de Vis√£o (FOV)")]
     public bool ativarFov = true;
 
-    [Tooltip("Quantos graus o FOV abre quando o player est· na velocidade de corrida")]
+    [Tooltip("Quantos graus o FOV abre na velocidade de corrida")]
     public float aumentoFovCorrendo = 10f;
 
-    [Tooltip("Qu„o r·pido o FOV muda. Maior = mais r·pido")]
+    [Tooltip("Qu√£o r√°pido o FOV muda. Maior = mais r√°pido")]
     public float suavidadeFov = 5f;
 
     [Header("Tremor na Corrida")]
@@ -38,16 +36,15 @@ public class CameraCorrida : MonoBehaviour
     [Tooltip("Tamanho do tremor em graus. 0.3 = leve, 1 = forte")]
     public float intensidadeTremor = 0.3f;
 
-    [Tooltip("Rapidez do tremor. Maior = vibra mais r·pido")]
+    [Tooltip("Rapidez do tremor. Maior = vibra mais r√°pido")]
     public float velocidadeTremor = 12f;
 
-    // ===== Vari·veis internas =====
     private Camera cam;
-    private Vector3 posicaoBase;       // posiÁ„o original da c‚mera (na cabeÁa do player)
-    private float fovBase;             // FOV original da c‚mera
-    private float tempoBalanco = 0f;   // "relÛgio" dos passos
-    private Vector3 balancoAtual;      // quanto a c‚mera est· deslocada agora
-    private float forcaTremor = 0f;    // 0 = sem tremor, 1 = tremor cheio (sobe e desce suave)
+    private Vector3 posicaoBase;     // posi√ß√£o original da c√¢mera (na cabe√ßa do player)
+    private float fovBase;           // FOV original da c√¢mera
+    private float tempoBalanco = 0f; // rel√≥gio dos passos
+    private Vector3 balancoAtual;    // deslocamento atual do balan√ßo
+    private float forcaTremor = 0f;  // 0 = sem tremor, 1 = tremor cheio
 
     void Start()
     {
@@ -59,11 +56,17 @@ public class CameraCorrida : MonoBehaviour
             player = GetComponentInParent<Player>();
 
         if (player == null)
-            Debug.LogWarning("CameraCorrida: n„o achei o Player. Arraste ele no Inspector.");
+            Debug.LogWarning("CameraCorrida: n√£o achei o Player. Arraste ele no Inspector.");
     }
 
-    // LateUpdate roda DEPOIS do Update do Player.
-    // Assim o Player j· girou a c‚mera com o mouse, e sÛ somamos os efeitos por cima.
+    // Devolve o FOV original se o script for desligado
+    void OnDisable()
+    {
+        if (cam != null)
+            cam.fieldOfView = fovBase;
+    }
+
+    // Roda depois do Update do Player, ent√£o a rota√ß√£o do mouse j√° foi aplicada
     void LateUpdate()
     {
         if (player == null) return;
@@ -71,7 +74,7 @@ public class CameraCorrida : MonoBehaviour
         float velocidade = player.VelocidadeAtual;
         bool andandoNoChao = player.EstaNoChao && velocidade > 0.1f;
 
-        // De 0 (andando) atÈ 1 (velocidade de corrida). Usado para o FOV e o tremor crescerem juntos com a corrida.
+        // 0 = andando, 1 = velocidade de corrida
         float nivelCorrida = Mathf.InverseLerp(player.velocidadeAndar, player.velocidadeCorrer, velocidade);
 
         AtualizarBalanco(velocidade, andandoNoChao);
@@ -79,61 +82,55 @@ public class CameraCorrida : MonoBehaviour
         AtualizarTremor(nivelCorrida, andandoNoChao);
     }
 
-    // ========================================
-    // BALAN«O: a c‚mera faz um "8" deitado a cada par de passos
-    // ========================================
+    // Suaviza√ß√£o que n√£o depende do FPS (valor maior = chega mais r√°pido)
+    static float Suavizar(float velocidade)
+    {
+        return 1f - Mathf.Exp(-velocidade * Time.deltaTime);
+    }
+
+    // Balan√ßo: a c√¢mera faz um "8" deitado a cada par de passos
     void AtualizarBalanco(float velocidade, bool andandoNoChao)
     {
-        Vector3 alvo = Vector3.zero; // parado ou no ar: c‚mera volta para o centro
+        Vector3 alvo = Vector3.zero; // parado ou no ar: volta ao centro
 
         if (ativarBalanco && andandoNoChao)
         {
-            // Quanto mais r·pido, mais r·pido os passos
             float ritmo = velocidade / Mathf.Max(player.velocidadeAndar, 0.01f);
             tempoBalanco += Time.deltaTime * passosPorSegundo * ritmo * Mathf.PI;
 
-            // Seno e cosseno fazem a c‚mera ir e voltar de forma suave
-            alvo.x = Mathf.Cos(tempoBalanco) * larguraBalanco;      // lado a lado: 1 vez a cada 2 passos
-            alvo.y = Mathf.Sin(tempoBalanco * 2f) * alturaBalanco;  // sobe e desce: 1 vez a cada passo
+            alvo.x = Mathf.Cos(tempoBalanco) * larguraBalanco;     // lado a lado
+            alvo.y = Mathf.Sin(tempoBalanco * 2f) * alturaBalanco; // sobe e desce
         }
 
-        // Chega no alvo aos poucos (sem trancos ao comeÁar ou parar de andar)
-        balancoAtual = Vector3.Lerp(balancoAtual, alvo, Time.deltaTime * 10f);
+        balancoAtual = Vector3.Lerp(balancoAtual, alvo, Suavizar(10f));
         transform.localPosition = posicaoBase + balancoAtual;
     }
 
-    // ========================================
-    // FOV: abre a vis„o conforme a velocidade sobe atÈ a corrida
-    // ========================================
+    // FOV: abre conforme a velocidade sobe at√© a corrida
     void AtualizarFov(float nivelCorrida)
     {
         if (!ativarFov) return;
 
         float fovAlvo = fovBase + aumentoFovCorrendo * nivelCorrida;
-        cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fovAlvo, Time.deltaTime * suavidadeFov);
+        cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, fovAlvo, Suavizar(suavidadeFov));
     }
 
-    // ========================================
-    // TREMOR: pequenas viradas aleatÛrias enquanto corre
-    // ========================================
+    // Tremor: pequenas viradas suaves enquanto corre
     void AtualizarTremor(float nivelCorrida, bool andandoNoChao)
     {
         if (!ativarTremor) return;
 
-        // O tremor depende do Player girar a c‚mera todo frame (ele "zera" a rotaÁ„o).
-        // Se a c‚mera n„o estiver em "Camera Personagem", o tremor iria se acumular, ent„o n„o aplicamos.
+        // O Player redefine a rota√ß√£o da c√¢mera todo frame; sem isso o tremor se acumularia
         if (player.cameraPersonagem != transform) return;
 
-        // Treme sÛ correndo no ch„o; aumenta e diminui suave
         float alvo = (andandoNoChao && player.EstadoAtual == EstadoMovimento.Correndo) ? nivelCorrida : 0f;
-        forcaTremor = Mathf.Lerp(forcaTremor, alvo, Time.deltaTime * 5f);
+        forcaTremor = Mathf.Lerp(forcaTremor, alvo, Suavizar(5f));
+        if (forcaTremor < 0.001f) return;
 
-        // PerlinNoise d· n˙meros "aleatÛrios" mas suaves (melhor que Random para tremer)
         float t = Time.time * velocidadeTremor;
         float tremorX = (Mathf.PerlinNoise(t, 0f) - 0.5f) * 2f * intensidadeTremor * forcaTremor;
         float tremorZ = (Mathf.PerlinNoise(0f, t) - 0.5f) * 2f * intensidadeTremor * forcaTremor;
 
-        // Soma o tremor por cima da rotaÁ„o que o Player deu com o mouse
         transform.localRotation *= Quaternion.Euler(tremorX, 0f, tremorZ);
     }
 }
