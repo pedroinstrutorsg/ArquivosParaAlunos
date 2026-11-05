@@ -1,449 +1,1494 @@
-local ServerScriptService = game:GetService("ServerScriptService")
-local ServerStorage = game:GetService("ServerStorage")
-local pastaTycoons = workspace:FindFirstChild("Tycoons")
-local blocos = ServerStorage:FindFirstChild("Blocos")
-local linhas = {}
-local erros = 0
-local avisos = 0
-local function linha(texto)
-	table.insert(linhas, { "info", texto })
-end
-local function ok(texto)
-	table.insert(linhas, { "info", "  [OK] " .. texto })
-end
-local function aviso(texto)
-	avisos += 1
-	table.insert(linhas, { "aviso", "  [AVISO] " .. texto })
-end
-local function erro(texto)
-	erros += 1
-	table.insert(linhas, { "erro", "  [ERRO] " .. texto })
-end
-local function titulo(texto)
-	table.insert(linhas, { "info", "" })
-	table.insert(linhas, { "info", "==== " .. texto .. " ====" })
-end
-local function tem(texto, trecho)
-	return texto:find(trecho, 1, true) ~= nil
-end
-local function nomeCurto(obj)
-	local nome = obj:GetFullName():gsub("^Workspace%.Tycoons%.", "")
-	return nome
-end
-local function baseDe(obj)
-	if not pastaTycoons then return nil end
-	local atual = obj
+-- ========================================
+-- CORREÇÃO DO PROJETO
+-- Conserta o tycoon e atualiza todos os scripts para a versão nova.
+-- Como usar: na barra de comando, rode
+-- require(game.ServerStorage.CorrigirProjeto)()
+-- ========================================
+
+-- versões novas de todos os scripts do jogo
+local FONTES = {}
+
+FONTES.Economia = [===[
+-- ========================================
+-- MODULE SCRIPT: ECONOMIA
+-- Guarda o armazém de cada base e a carteira de cada jogador
+-- ========================================
+
+local Economia = {}
+
+-- dinheiro esperando coleta em cada base: armazens[tycoon] = valor
+Economia.armazens = {}
+
+-- dinheiro de cada jogador: carteiras[UserId] = valor
+Economia.carteiras = {}
+
+-- pasta que guarda todas as bases
+local pastaTycoons = workspace:WaitForChild("Tycoons")
+
+-- devolve a base onde o objeto está (ou nil se estiver fora de uma base)
+function Economia.acharTycoon(objeto)
+	local atual = objeto
 	while atual and atual.Parent ~= pastaTycoons do
 		atual = atual.Parent
 	end
-	if atual and (atual:IsA("Folder") or atual:IsA("Model")) then return atual end
+	return atual
+end
+
+-- diz se o jogador é o dono da base
+function Economia.ehDono(tycoon, jogador)
+	return tycoon ~= nil and tycoon:GetAttribute("Dono") == jogador.UserId
+end
+
+-- devolve a base do jogador (ou nil se ele não tiver base)
+function Economia.tycoonDoJogador(jogador)
+	for _, tycoon in ipairs(pastaTycoons:GetChildren()) do
+		if tycoon:GetAttribute("Dono") == jogador.UserId then
+			return tycoon
+		end
+	end
 	return nil
 end
-local function tipoDoScript(s)
-	local src = s.Source
-	if s:IsA("ModuleScript") then
-		if tem(src, "carteiras") and tem(src, "adicionarAoArmazem") then return "Economia" end
-		return "Outro"
+
+-- devolve quanto dinheiro está no armazém da base
+function Economia.pegarArmazem(tycoon)
+	return Economia.armazens[tycoon] or 0
+end
+
+-- soma dinheiro no armazém da base
+function Economia.adicionarAoArmazem(tycoon, valor)
+	Economia.armazens[tycoon] = Economia.pegarArmazem(tycoon) + valor
+end
+
+-- zera o armazém da base
+function Economia.esvaziarArmazem(tycoon)
+	Economia.armazens[tycoon] = 0
+end
+
+-- passa o dinheiro do armazém da base para a carteira do jogador
+function Economia.coletarParaJogador(tycoon, jogador)
+	local valor = Economia.pegarArmazem(tycoon)
+
+	if valor > 0 then
+		local id = jogador.UserId
+		Economia.carteiras[id] = (Economia.carteiras[id] or 0) + valor
+		Economia.esvaziarArmazem(tycoon)
 	end
-	if tem(src, "entregarItens") then return "BotaoCompra" end
-	if tem(src, "tentarComprar") or tem(src, "jaComprado") then return "Botao" end
-	if tem(src, "tocarLaser") then return "PortaLaser" end
-	if tem(src, "levarParaPlaca") or tem(src, "renascerNaPlaca") then return "PlacaDono" end
-	if tem(src, 'SetAttribute("Dono"') then return "BotaoDono" end
-	if tem(src, "coletarParaJogador") then return "Coletor" end
-	if tem(src, 'SetAttribute("Valor", nil)') then return "DestinoFinal" end
-	if tem(src, "aplicarEfeito") then return "Upgrade" end
-	if tem(src, "criarBloco") then return "Gerador" end
-	if tem(src, "dinheiroPorCiclo") then return "GeradorTeste" end
-	if tem(src, "AssemblyLinearVelocity") then return "Esteira" end
-	if tem(src, "leaderstats") then return "EconomiaUI" end
-	if tem(src, "prefixo") and tem(src, "rmazem") then return "PainelArmazem" end
-	if tem(src, 'SetAttribute("Valor"') and tem(src, "Debris") then return "Bloco" end
-	return "Outro"
+
+	return valor
 end
-local function estaAtualizado(tipo, src)
-	if tipo == "Botao" then return tem(src, "nomesDeBotao") and tem(src, "ehDono") and tem(src, "criarTexto") end
-	if tipo == "BotaoDono" then return tem(src, "esconderAoPegar") end
-	if tipo == "DestinoFinal" then return tem(src, "adicionarAoArmazem(tycoon") end
-	if tipo == "Coletor" then return tem(src, "coletarParaJogador(tycoon") end
-	if tipo == "PainelArmazem" then return tem(src, "pegarArmazem(tycoon") end
-	if tipo == "PortaLaser" then return tem(src, "efeitosLaser") end
-	if tipo == "PlacaDono" then return tem(src, "tamanhoDoTexto") end
-	if tipo == "EconomiaUI" then return tem(src, "PlayerRemoving") end
-	if tipo == "Economia" then return tem(src, "tycoonDoJogador") end
-	return true
+
+return Economia
+]===]
+
+FONTES.EconomiaUI = [===[
+-- ========================================
+-- SCRIPT: ECONOMIA UI
+-- Mostra a carteira de cada jogador no leaderboard
+-- e apaga a carteira quando o jogador sai
+-- Local: ServerScriptService.EconomiaUI
+-- ========================================
+
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- cria o "leaderstats.Dinheiro" do jogador
+local function criarLeaderstats(jogador)
+	local leaderstats = Instance.new("Folder")
+	leaderstats.Name = "leaderstats"
+	leaderstats.Parent = jogador
+
+	local dinheiro = Instance.new("IntValue")
+	dinheiro.Name = "Dinheiro"
+	dinheiro.Value = Economia.carteiras[jogador.UserId] or 0
+	dinheiro.Parent = leaderstats
 end
-local function temPai(botao)
-	local atual = botao.Parent and botao.Parent.Parent
-	while atual and atual ~= game do
-		local outro = atual:FindFirstChild("Botao") or atual:FindFirstChild("BotaoCompra") or atual:FindFirstChild("BotaoDono")
-		if outro and outro:IsA("BasePart") then return true end
+
+-- jogadores que entrarem daqui pra frente
+Players.PlayerAdded:Connect(criarLeaderstats)
+
+-- jogadores que entraram antes deste script começar
+for _, jogador in ipairs(Players:GetPlayers()) do
+	criarLeaderstats(jogador)
+end
+
+-- apaga a carteira de quem sai
+Players.PlayerRemoving:Connect(function(jogador)
+	Economia.carteiras[jogador.UserId] = nil
+end)
+
+-- atualiza o dinheiro de todos a cada meio segundo
+while true do
+	task.wait(0.5)
+
+	for _, jogador in ipairs(Players:GetPlayers()) do
+		local leaderstats = jogador:FindFirstChild("leaderstats")
+		local dinheiro = leaderstats and leaderstats:FindFirstChild("Dinheiro")
+		if dinheiro then
+			dinheiro.Value = Economia.carteiras[jogador.UserId] or 0
+		end
+	end
+end
+]===]
+
+FONTES.BotaoDono = [===[
+-- ========================================
+-- SCRIPT: BOTÃO DONO
+-- Dá a base para o primeiro jogador que tocar,
+-- some depois que a base é pega e volta quando ela fica livre
+-- Local: Tycoons.TycoonX.BotaoDono
+-- ========================================
+
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- a peça do botão e a base onde ele está
+local botaoDono = script.Parent
+local tycoon = Economia.acharTycoon(botaoDono)
+
+-- texto da placa do botão
+local texto = botaoDono:FindFirstChildWhichIsA("TextLabel", true)
+
+-- ========================================
+-- CONFIGURAÇÕES
+-- ========================================
+local textoLivre = "Base livre"  -- texto quando a base não tem dono
+local textoDono = "Base de "     -- texto antes do nome do dono
+local esconderAoPegar = true     -- true: o botão some quando alguém pega a base
+
+-- ========================================
+-- VARIÁVEIS DE CONTROLE
+-- ========================================
+local original = {}  -- como o botão e o que tem dentro eram no Studio
+
+-- valor de cada propriedade quando o botão está escondido
+local escondido = {
+	Transparency = 1,
+	CanCollide = false,
+	CanTouch = false,
+	Enabled = false,
+}
+
+-- ========================================
+-- FUNÇÕES
+-- ========================================
+
+-- anota como o botão e o que tem dentro estão no Studio
+local function anotar()
+	original[botaoDono] = {
+		Transparency = botaoDono.Transparency,
+		CanCollide = botaoDono.CanCollide,
+		CanTouch = botaoDono.CanTouch,
+	}
+	for _, objeto in ipairs(botaoDono:GetDescendants()) do
+		if objeto:IsA("Decal") then
+			original[objeto] = { Transparency = objeto.Transparency }
+		elseif objeto:IsA("SurfaceGui") or objeto:IsA("BillboardGui") or objeto:IsA("ParticleEmitter") or objeto:IsA("Light") then
+			original[objeto] = { Enabled = objeto.Enabled }
+		end
+	end
+end
+
+-- esconde o botão
+local function esconder()
+	for objeto, propriedades in pairs(original) do
+		for nome in pairs(propriedades) do
+			objeto[nome] = escondido[nome]
+		end
+	end
+end
+
+-- mostra o botão de novo
+local function mostrar()
+	for objeto, propriedades in pairs(original) do
+		for nome, valor in pairs(propriedades) do
+			objeto[nome] = valor
+		end
+	end
+end
+
+-- escreve na placa o nome do dono, ou "Base livre"
+local function atualizarPlaca(jogador)
+	if not texto then return end
+	if jogador then
+		texto.Text = textoDono .. jogador.Name
+	else
+		texto.Text = textoLivre
+	end
+end
+
+-- ========================================
+-- EVENTOS
+-- ========================================
+
+-- dá a base para o jogador que tocou
+botaoDono.Touched:Connect(function(hit)
+	if tycoon:GetAttribute("Dono") then return end
+
+	local jogador = Players:GetPlayerFromCharacter(hit.Parent)
+	if not jogador then return end
+
+	-- cada jogador só pode ter uma base
+	if Economia.tycoonDoJogador(jogador) then return end
+
+	tycoon:SetAttribute("Dono", jogador.UserId)
+	Economia.esvaziarArmazem(tycoon)
+	atualizarPlaca(jogador)
+
+	if esconderAoPegar then
+		esconder()
+	end
+
+	-- avisa os botões do térreo que podem aparecer
+	botaoDono:SetAttribute("Comprado", true)
+
+	print(jogador.Name .. " pegou a base " .. tycoon.Name)
+end)
+
+-- libera a base quando o dono sai
+Players.PlayerRemoving:Connect(function(jogador)
+	if tycoon:GetAttribute("Dono") ~= jogador.UserId then return end
+
+	tycoon:SetAttribute("Dono", nil)
+	Economia.esvaziarArmazem(tycoon)
+	atualizarPlaca(nil)
+	mostrar()
+
+	-- avisa os botões que a base resetou
+	botaoDono:SetAttribute("Comprado", nil)
+
+	print("A base " .. tycoon.Name .. " ficou livre")
+end)
+
+-- ========================================
+-- QUANDO O JOGO COMEÇA
+-- ========================================
+anotar()
+atualizarPlaca(nil)
+]===]
+
+FONTES.Botao = [===[
+-- ========================================
+-- SCRIPT: BOTÃO DE COMPRA
+-- Esconde os itens da pasta até o dono da base comprar.
+-- Mostra em cima do botão o nome do item e o preço.
+-- Local: dentro da peça Botao (ex: Tycoons.Tycoon1.Botao1.Botao)
+-- IMPORTANTE: toda peça de botão precisa se chamar "Botao"
+-- ========================================
+
+local ServerScriptService = game:GetService("ServerScriptService")
+local Players = game:GetService("Players")
+local Economia = require(ServerScriptService.Economia)
+
+-- a peça do botão, a pasta dele e a base onde ele está
+local botao = script.Parent
+local pasta = botao.Parent
+local tycoon = Economia.acharTycoon(botao)
+
+-- ========================================
+-- CONFIGURAÇÕES DO BOTÃO
+-- ========================================
+local preco = 0                 -- quanto custa
+local nomeDoItem = "Gerador"    -- nome que aparece em cima do botão
+local ancorarAoComprar = true   -- true: tudo fica preso no lugar depois da compra
+local alturaDoTexto = 3         -- altura do texto acima do botão
+local tamanhoDoTexto = 1        -- tamanho do texto (1 = normal, 2 = dobro, 0.5 = metade)
+local distanciaDoTexto = 60     -- distância máxima para ver o texto
+local corDoTexto = Color3.fromRGB(255, 255, 255)  -- cor do texto
+
+-- ========================================
+-- VARIÁVEIS DE CONTROLE
+-- ========================================
+local jaComprado = false  -- se este botão já foi comprado
+local liberado = true     -- se este botão pode ser comprado agora
+local originalItens = {}  -- como cada item da pasta era no Studio
+local originalBotao = {}  -- como o botão era no Studio
+
+-- nomes das peças que funcionam como botão
+local nomesDeBotao = { "Botao", "BotaoCompra" }
+
+-- tipos de objeto que ligam e desligam
+local tiposComEnabled = {
+	"Script", "ParticleEmitter", "Light", "Fire", "Smoke", "Sparkles",
+	"Beam", "Trail", "SurfaceGui", "BillboardGui", "ProximityPrompt",
+}
+
+-- valor de cada propriedade quando o objeto está escondido
+local escondido = {
+	Transparency = 1,
+	CanCollide = false,
+	CanTouch = false,
+	CanQuery = false,
+	Anchored = true,
+	Enabled = false,
+	Playing = false,
+}
+
+-- ========================================
+-- FUNÇÕES
+-- ========================================
+
+-- cria o texto com o nome e o preço em cima do botão
+local function criarTexto()
+	local placa = Instance.new("BillboardGui")
+	placa.Name = "TextoBotao"
+	placa.Size = UDim2.new(0, 200 * tamanhoDoTexto, 0, 60 * tamanhoDoTexto)
+	placa.StudsOffset = Vector3.new(0, alturaDoTexto, 0)
+	placa.MaxDistance = distanciaDoTexto
+	placa.Parent = botao
+
+	local texto = Instance.new("TextLabel")
+	texto.Size = UDim2.new(1, 0, 1, 0)
+	texto.BackgroundTransparency = 1
+	texto.TextScaled = true
+	texto.Font = Enum.Font.GothamBold
+	texto.TextColor3 = corDoTexto
+	texto.TextStrokeTransparency = 0
+	texto.Parent = placa
+
+	if preco == 0 then
+		texto.Text = nomeDoItem .. "\nGrátis"
+	else
+		texto.Text = nomeDoItem .. "\n$" .. preco
+	end
+end
+
+-- diz se o objeto é de um tipo que liga e desliga
+local function temEnabled(objeto)
+	for _, tipo in ipairs(tiposComEnabled) do
+		if objeto:IsA(tipo) then
+			return true
+		end
+	end
+	return false
+end
+
+-- diz se o objeto é o botão ou está dentro dele
+local function ehDoBotao(objeto)
+	return objeto == botao or objeto:IsDescendantOf(botao)
+end
+
+-- diz se o objeto pertence a um botão de dentro desta pasta
+local function ehDeOutroBotao(objeto)
+	local atual = objeto.Parent
+	while atual and atual ~= pasta do
+		for _, nome in ipairs(nomesDeBotao) do
+			local outro = atual:FindFirstChild(nome)
+			if outro and outro ~= botao and outro:IsA("BasePart") then
+				return true
+			end
+		end
 		atual = atual.Parent
 	end
 	return false
 end
-local precisaDePeca = { Botao = true, BotaoCompra = true, BotaoDono = true, Gerador = true, Esteira = true, Upgrade = true, DestinoFinal = true, Coletor = true, PainelArmazem = true, PlacaDono = true }
-local precisaBase = { Botao = true, BotaoCompra = true, BotaoDono = true, Coletor = true, DestinoFinal = true, PainelArmazem = true, PortaLaser = true, PlacaDono = true }
-local ignorados = { CorrigirProjeto = true, RelatorioProjeto = true, RelatorioCorrecao = true }
-local scripts = {}
-for _, servico in ipairs({ workspace, ServerScriptService, ServerStorage }) do
-	for _, s in ipairs(servico:GetDescendants()) do
-		if s:IsA("LuaSourceContainer") and not ignorados[s.Name] then
-			table.insert(scripts, { obj = s, tipo = tipoDoScript(s) })
+
+-- devolve o botão pai (um botão acima, ou o BotaoDono da base)
+local function acharBotaoPai()
+	local atual = pasta.Parent
+	while atual and atual ~= game do
+		local outro = atual:FindFirstChild("Botao") or atual:FindFirstChild("BotaoCompra") or atual:FindFirstChild("BotaoDono")
+		if outro and outro:IsA("BasePart") then
+			return outro
+		end
+		atual = atual.Parent
+	end
+	return nil
+end
+
+-- anota as propriedades do objeto como estão no Studio
+local function anotar(objeto, tabela)
+	if objeto:IsA("BasePart") then
+		tabela[objeto] = {
+			Transparency = objeto.Transparency,
+			CanCollide = objeto.CanCollide,
+			CanTouch = objeto.CanTouch,
+			CanQuery = objeto.CanQuery,
+			Anchored = objeto.Anchored,
+		}
+	elseif objeto:IsA("Decal") then
+		tabela[objeto] = { Transparency = objeto.Transparency }
+	elseif objeto:IsA("Sound") then
+		tabela[objeto] = { Playing = objeto.Playing }
+	elseif temEnabled(objeto) then
+		tabela[objeto] = { Enabled = objeto.Enabled }
+	end
+end
+
+-- esconde tudo o que está na tabela
+local function ocultar(tabela)
+	for objeto, propriedades in pairs(tabela) do
+		if objeto.Parent then
+			for nome in pairs(propriedades) do
+				objeto[nome] = escondido[nome]
+			end
 		end
 	end
 end
-linha("RELATÓRIO DO PROJETO - " .. os.date("%d/%m/%Y %H:%M"))
-titulo("PASTAS PRINCIPAIS")
-local bases = {}
-if pastaTycoons then
-	ok("Workspace.Tycoons")
+
+-- devolve as propriedades anotadas de um objeto
+local function restaurar(objeto, propriedades)
+	for nome, valor in pairs(propriedades) do
+		objeto[nome] = valor
+	end
+	if ancorarAoComprar and objeto:IsA("BasePart") then
+		objeto.Anchored = true
+	end
+end
+
+-- mostra tudo o que está na tabela (scripts por último)
+local function mostrar(tabela)
+	local scripts = {}
+	for objeto, propriedades in pairs(tabela) do
+		if objeto.Parent then
+			if objeto:IsA("Script") then
+				table.insert(scripts, objeto)
+			else
+				restaurar(objeto, propriedades)
+			end
+		end
+	end
+	for _, s in ipairs(scripts) do
+		restaurar(s, tabela[s])
+	end
+end
+
+-- mostra o botão para poder ser comprado
+local function aparecer()
+	if liberado or jaComprado then return end
+	liberado = true
+	mostrar(originalBotao)
+end
+
+-- volta o botão e os itens para o começo
+local function resetar()
+	if jaComprado then
+		ocultar(originalItens)
+	end
+	jaComprado = false
+	liberado = false
+	ocultar(originalBotao)
+	botao:SetAttribute("Comprado", nil)
+end
+
+-- compra quando o dono toca no botão
+local function tentarComprar(hit)
+	if jaComprado or not liberado then return end
+
+	local jogador = Players:GetPlayerFromCharacter(hit.Parent)
+	if not jogador then return end
+
+	-- só o dono da base compra
+	if not Economia.ehDono(tycoon, jogador) then return end
+
+	local carteira = Economia.carteiras[jogador.UserId] or 0
+
+	if carteira >= preco then
+		jaComprado = true
+		Economia.carteiras[jogador.UserId] = carteira - preco
+
+		mostrar(originalItens)
+		ocultar(originalBotao)
+
+		-- avisa os botões de dentro que podem aparecer
+		botao:SetAttribute("Comprado", true)
+
+		print(jogador.Name .. " comprou por " .. preco)
+	else
+		print(jogador.Name .. " não tem dinheiro suficiente")
+	end
+end
+
+-- ========================================
+-- QUANDO O JOGO COMEÇA
+-- ========================================
+
+-- apaga placas antigas feitas à mão e cria o texto
+for _, objeto in ipairs(botao:GetChildren()) do
+	if objeto:IsA("BillboardGui") or objeto:IsA("TextLabel") then
+		objeto:Destroy()
+	end
+end
+criarTexto()
+
+-- anota os itens desta pasta
+for _, objeto in ipairs(pasta:GetDescendants()) do
+	if not ehDoBotao(objeto) and not ehDeOutroBotao(objeto) then
+		anotar(objeto, originalItens)
+	end
+end
+
+-- anota o botão e o que está dentro dele (menos este script)
+anotar(botao, originalBotao)
+for _, objeto in ipairs(botao:GetDescendants()) do
+	if objeto ~= script then
+		anotar(objeto, originalBotao)
+	end
+end
+
+-- esconde os itens
+ocultar(originalItens)
+
+-- segue o botão pai: aparece quando ele é comprado, reseta quando ele reseta
+local botaoPai = acharBotaoPai()
+
+if botaoPai then
+	local function verificarPai()
+		if botaoPai:GetAttribute("Comprado") then
+			aparecer()
+		else
+			resetar()
+		end
+	end
+
+	botaoPai:GetAttributeChangedSignal("Comprado"):Connect(verificarPai)
+	verificarPai()
+end
+
+-- liga a compra ao toque no botão
+botao.Touched:Connect(tentarComprar)
+]===]
+
+FONTES.DestinoFinal = [===[
+-- ========================================
+-- SCRIPT: DESTINO FINAL
+-- Vende o bloco que encosta aqui e manda o valor para o armazém da base
+-- Local: dentro da peça DestinoFinal
+-- ========================================
+
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- a peça do destino e a base onde ele está
+local destino = script.Parent
+local tycoon = Economia.acharTycoon(destino)
+
+-- ========================================
+-- CONFIGURAÇÕES DO DESTINO
+-- ========================================
+local tempoAteSumir = 1  -- segundos entre o bloco tocar e sumir
+
+-- vende o bloco que encostou
+destino.Touched:Connect(function(hit)
+	local valor = hit:GetAttribute("Valor")
+	if not valor then return end
+
+	-- tira a etiqueta para o bloco não ser vendido 2x
+	hit:SetAttribute("Valor", nil)
+
+	task.wait(tempoAteSumir)
+	hit:Destroy()
+
+	-- só guarda o dinheiro se a base ainda tiver dono
+	if tycoon:GetAttribute("Dono") then
+		Economia.adicionarAoArmazem(tycoon, valor)
+		print("Bloco vendido por " .. valor .. "! Armazém: " .. Economia.pegarArmazem(tycoon))
+	end
+end)
+]===]
+
+FONTES.Coletor = [===[
+-- ========================================
+-- SCRIPT: COLETOR
+-- Passa o dinheiro do armazém da base para a carteira do dono
+-- Local: Tycoons.TycoonX.Coletor
+-- ========================================
+
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- a peça do coletor e a base onde ele está
+local parte = script.Parent
+local tycoon = Economia.acharTycoon(parte)
+
+-- coleta quando o dono toca
+parte.Touched:Connect(function(hit)
+	local jogador = Players:GetPlayerFromCharacter(hit.Parent)
+	if not jogador then return end
+
+	-- só o dono da base coleta
+	if not Economia.ehDono(tycoon, jogador) then return end
+
+	local valor = Economia.coletarParaJogador(tycoon, jogador)
+
+	-- só avisa quando coletou alguma coisa
+	if valor > 0 then
+		local total = Economia.carteiras[jogador.UserId]
+		print(jogador.Name .. " coletou " .. valor .. "! Carteira agora: " .. total)
+	end
+end)
+]===]
+
+FONTES.PainelArmazem = [===[
+-- ========================================
+-- SCRIPT: PAINEL DO ARMAZÉM
+-- Mostra quanto dinheiro está no armazém da base
+-- Local: Tycoons.TycoonX.PainelArmazem
+-- ========================================
+
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- a peça do painel e a base onde ele está
+local painel = script.Parent
+local tycoon = Economia.acharTycoon(painel)
+
+-- ========================================
+-- CONFIGURAÇÕES DO PAINEL
+-- ========================================
+local intervaloAtualizacao = 0.5  -- segundos entre cada atualização
+local prefixo = "Armazém: $"      -- texto antes do número
+
+-- texto da placa (cria um se não existir)
+local texto = painel:FindFirstChildWhichIsA("TextLabel", true)
+if not texto then
+	local tela = Instance.new("SurfaceGui")
+	tela.Face = Enum.NormalId.Front
+	tela.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	tela.Parent = painel
+
+	texto = Instance.new("TextLabel")
+	texto.Size = UDim2.new(1, 0, 1, 0)
+	texto.BackgroundTransparency = 1
+	texto.TextScaled = true
+	texto.Font = Enum.Font.GothamBold
+	texto.TextColor3 = Color3.fromRGB(255, 255, 255)
+	texto.TextStrokeTransparency = 0
+	texto.Parent = tela
+end
+
+-- atualiza o texto para sempre
+while true do
+	texto.Text = prefixo .. Economia.pegarArmazem(tycoon)
+	task.wait(intervaloAtualizacao)
+end
+]===]
+
+FONTES.PlacaDono = [===[
+-- ========================================
+-- SCRIPT: PLACA DO DONO
+-- Mostra quem é o dono da base e faz o dono
+-- renascer na frente da placa quando morrer
+-- Local: Tycoons.TycoonX.PlacaDono
+-- ========================================
+
+local Players = game:GetService("Players")
+local ServerScriptService = game:GetService("ServerScriptService")
+local Economia = require(ServerScriptService.Economia)
+
+-- a placa e a base onde ela está
+local placa = script.Parent
+local tycoon = Economia.acharTycoon(placa)
+
+-- ========================================
+-- CONFIGURAÇÕES DO TEXTO
+-- ========================================
+local textoLivre = "Base livre"                     -- texto quando a base não tem dono
+local textoDono = "Base de"                         -- texto antes do nome do dono
+local quebrarLinha = true                           -- true: nome do dono na linha de baixo
+local usarApelido = false                           -- true: mostra o apelido (DisplayName) em vez do nome
+local tamanhoDoTexto = 0                            -- tamanho do texto (0 = automático, ocupa a placa toda)
+local fonte = Enum.Font.GothamBold                  -- fonte do texto
+local corDoTexto = Color3.fromRGB(255, 255, 255)    -- cor do texto
+local mostrarContorno = true                        -- true: contorno em volta das letras
+local corDoContorno = Color3.fromRGB(0, 0, 0)       -- cor do contorno
+local corDoFundo = Color3.fromRGB(0, 0, 0)          -- cor do fundo do texto
+local transparenciaDoFundo = 1                      -- fundo (0 = sólido, 1 = sem fundo)
+local ladoDoTexto = Enum.NormalId.Front             -- lado da placa onde fica o texto
+
+-- ========================================
+-- CONFIGURAÇÕES DO RENASCIMENTO
+-- ========================================
+local renascerNaPlaca = true   -- true: o dono renasce na frente da placa
+local distanciaRenascer = 5    -- distância da placa onde o dono renasce
+local alturaRenascer = 3       -- altura do renascimento em relação ao centro da placa
+
+-- ========================================
+-- VARIÁVEIS DE CONTROLE
+-- ========================================
+local conexaoRenascer = nil  -- ligação com o renascimento do dono atual
+local texto = nil            -- texto da placa
+
+-- ========================================
+-- FUNÇÕES
+-- ========================================
+
+-- cria o texto da placa com as configurações
+local function criarTexto()
+	local tela = Instance.new("SurfaceGui")
+	tela.Name = "TextoPlaca"
+	tela.Face = ladoDoTexto
+	tela.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	tela.Parent = placa
+
+	texto = Instance.new("TextLabel")
+	texto.Size = UDim2.new(1, 0, 1, 0)
+	texto.Font = fonte
+	texto.TextColor3 = corDoTexto
+	texto.TextWrapped = true
+	texto.BackgroundColor3 = corDoFundo
+	texto.BackgroundTransparency = transparenciaDoFundo
+	texto.TextStrokeColor3 = corDoContorno
+
+	if mostrarContorno then
+		texto.TextStrokeTransparency = 0
+	else
+		texto.TextStrokeTransparency = 1
+	end
+
+	if tamanhoDoTexto == 0 then
+		texto.TextScaled = true
+	else
+		texto.TextScaled = false
+		texto.TextSize = tamanhoDoTexto
+	end
+
+	texto.Parent = tela
+end
+
+-- devolve o nome do dono do jeito escolhido
+local function nomeDoJogador(jogador)
+	if usarApelido then
+		return jogador.DisplayName
+	end
+	return jogador.Name
+end
+
+-- leva o personagem para a frente do lado do texto
+local function levarParaPlaca(personagem)
+	personagem:WaitForChild("HumanoidRootPart")
+	task.wait(0.1)
+
+	local direcao = placa.CFrame:VectorToWorldSpace(Vector3.FromNormalId(ladoDoTexto))
+	local posicao = placa.Position + direcao * distanciaRenascer + Vector3.new(0, alturaRenascer, 0)
+	local olhar = Vector3.new(direcao.X, 0, direcao.Z)
+
+	if olhar.Magnitude > 0 then
+		personagem:PivotTo(CFrame.lookAt(posicao, posicao + olhar))
+	else
+		personagem:PivotTo(CFrame.new(posicao))
+	end
+end
+
+-- atualiza o texto e o renascimento quando o dono muda
+local function atualizarDono()
+	if conexaoRenascer then
+		conexaoRenascer:Disconnect()
+		conexaoRenascer = nil
+	end
+
+	local id = tycoon:GetAttribute("Dono")
+	local dono = id and Players:GetPlayerByUserId(id)
+
+	if dono then
+		local separador = " "
+		if quebrarLinha then
+			separador = "\n"
+		end
+		texto.Text = textoDono .. separador .. nomeDoJogador(dono)
+
+		if renascerNaPlaca then
+			conexaoRenascer = dono.CharacterAdded:Connect(levarParaPlaca)
+		end
+	else
+		texto.Text = textoLivre
+	end
+end
+
+-- ========================================
+-- QUANDO O JOGO COMEÇA
+-- ========================================
+
+-- apaga textos antigos da placa e cria o novo
+for _, objeto in ipairs(placa:GetChildren()) do
+	if objeto:IsA("SurfaceGui") or objeto:IsA("BillboardGui") then
+		objeto:Destroy()
+	end
+end
+criarTexto()
+
+tycoon:GetAttributeChangedSignal("Dono"):Connect(atualizarDono)
+atualizarDono()
+]===]
+
+FONTES.Bloco = [===[
+-- ========================================
+-- SCRIPT: BLOCO
+-- O "material" que cai do gerador e vale dinheiro
+-- Local: ServerStorage.Blocos.NomeDoMolde
+-- ========================================
+
+local bloco = script.Parent
+
+-- ========================================
+-- CONFIGURAÇÕES DO BLOCO
+-- ========================================
+local valor = 5          -- quanto dinheiro esse bloco vale
+local tempoDeVida = 20   -- segundos até o bloco sumir sozinho
+
+-- guarda o valor no bloco para outros scripts lerem
+bloco:SetAttribute("Valor", valor)
+
+-- destrói o bloco depois do tempo de vida
+local Debris = game:GetService("Debris")
+Debris:AddItem(bloco, tempoDeVida)
+]===]
+
+-- ========================================
+-- CORREÇÃO
+-- ========================================
+return function()
+	local ServerScriptService = game:GetService("ServerScriptService")
+	local ServerStorage = game:GetService("ServerStorage")
+	local historico = game:GetService("ChangeHistoryService")
+
+	local pastaTycoons = workspace:FindFirstChild("Tycoons")  -- pasta das bases
+	local blocos = ServerStorage:FindFirstChild("Blocos")     -- pasta dos moldes
+
+	local linhas = {}     -- linhas do relatório
+	local corrigidos = 0  -- quantidade de correções feitas
+	local manuais = 0     -- quantidade de coisas para fazer à mão
+
+	-- scripts que precisam ficar dentro de uma peça
+	local precisaDePeca = {
+		Botao = true, BotaoCompra = true, BotaoDono = true, Gerador = true, Esteira = true,
+		Upgrade = true, DestinoFinal = true, Coletor = true, PainelArmazem = true, PlacaDono = true,
+	}
+
+	-- scripts que precisam ficar dentro de uma base
+	local precisaDeBase = {
+		Botao = true, BotaoCompra = true, BotaoDono = true, DestinoFinal = true,
+		Coletor = true, PainelArmazem = true, PlacaDono = true, PortaLaser = true,
+	}
+
+	-- adiciona uma linha comum ao relatório
+	local function linha(texto)
+		table.insert(linhas, { "info", texto })
+	end
+
+	-- adiciona um título de seção
+	local function titulo(texto)
+		linha("")
+		linha("==== " .. texto .. " ====")
+	end
+
+	-- adiciona uma correção feita
+	local function corrigido(texto)
+		corrigidos += 1
+		table.insert(linhas, { "info", "  [CORRIGIDO] " .. texto })
+	end
+
+	-- adiciona algo para fazer à mão
+	local function manual(texto)
+		manuais += 1
+		table.insert(linhas, { "aviso", "  [FAZER À MÃO] " .. texto })
+	end
+
+	-- diz se o texto tem um trecho
+	local function tem(texto, trecho)
+		return texto:find(trecho, 1, true) ~= nil
+	end
+
+	-- caminho do objeto sem o começo "Workspace.Tycoons."
+	local function nomeCurto(obj)
+		local nome = obj:GetFullName():gsub("^Workspace%.Tycoons%.", "")
+		return nome
+	end
+
+	-- devolve a base onde o objeto está (ou nil)
+	local function baseDe(obj)
+		if not pastaTycoons then return nil end
+		local atual = obj
+		while atual and atual.Parent ~= pastaTycoons do
+			atual = atual.Parent
+		end
+		return atual
+	end
+
+	-- descobre o tipo do script pelo conteúdo
+	local function tipoDoScript(s)
+		local src = s.Source
+		if s:IsA("ModuleScript") then
+			if tem(src, "carteiras") and tem(src, "adicionarAoArmazem") then return "Economia" end
+			return "Outro"
+		end
+		if tem(src, "entregarItens") then return "BotaoCompra" end
+		if tem(src, "tentarComprar") or tem(src, "jaComprado") then return "Botao" end
+		if tem(src, "tocarLaser") then return "PortaLaser" end
+		if tem(src, "levarParaPlaca") or tem(src, "renascerNaPlaca") then return "PlacaDono" end
+		if tem(src, 'SetAttribute("Dono"') then return "BotaoDono" end
+		if tem(src, "coletarParaJogador") then return "Coletor" end
+		if tem(src, 'SetAttribute("Valor", nil)') then return "DestinoFinal" end
+		if tem(src, "aplicarEfeito") then return "Upgrade" end
+		if tem(src, "criarBloco") then return "Gerador" end
+		if tem(src, "dinheiroPorCiclo") then return "GeradorTeste" end
+		if tem(src, "AssemblyLinearVelocity") then return "Esteira" end
+		if tem(src, "leaderstats") then return "EconomiaUI" end
+		if tem(src, "prefixo") and tem(src, "rmazem") then return "PainelArmazem" end
+		if tem(src, 'SetAttribute("Valor"') and tem(src, "Debris") then return "Bloco" end
+		return "Outro"
+	end
+
+	-- diz se o script está na versão mais nova
+	local function estaAtualizado(tipo, src)
+		if tipo == "Botao" then return tem(src, "nomesDeBotao") and tem(src, "ehDono") and tem(src, "criarTexto") end
+		if tipo == "BotaoDono" then return tem(src, "esconderAoPegar") end
+		if tipo == "DestinoFinal" then return tem(src, "adicionarAoArmazem(tycoon") end
+		if tipo == "Coletor" then return tem(src, "coletarParaJogador(tycoon") end
+		if tipo == "PainelArmazem" then return tem(src, "pegarArmazem(tycoon") end
+		if tipo == "PlacaDono" then return tem(src, "tamanhoDoTexto") end
+		if tipo == "EconomiaUI" then return tem(src, "PlayerRemoving") end
+		if tipo == "Economia" then return tem(src, "tycoonDoJogador") end
+		return true
+	end
+
+	-- diz se o valor é um número, texto, true/false, cor ou Enum
+	local function ehLiteral(valor)
+		return valor:match("^%-?[%d%.]+$") ~= nil
+			or valor == "true" or valor == "false"
+			or valor:match('^".*"$') ~= nil
+			or valor:match("^Color3%.fromRGB%b()$") ~= nil
+			or valor:match("^Enum%.[%w%.]+$") ~= nil
+	end
+
+	-- troca o valor de uma configuração no texto do script
+	local function trocarValor(fonte, nome, valor)
+		local feito = false
+		local novo = fonte:gsub("\n(local%s+" .. nome .. "%s*=%s*)([^\n]*)", function(inicio, resto)
+			if feito then return nil end
+			feito = true
+			local comentario = resto:match("(%s*%-%-.*)$") or ""
+			return "\n" .. inicio .. valor .. comentario
+		end)
+		return novo
+	end
+
+	-- coloca no script novo as configurações que o script antigo tinha
+	local function manterConfigs(antigo, modelo)
+		local novo = modelo
+		for nome, resto in ("\n" .. antigo):gmatch("\nlocal%s+([%w_]+)%s*=%s*([^\n]*)") do
+			local valor = resto:gsub("%s*%-%-.*$", "")
+			valor = valor:gsub("%s+$", "")
+			if ehLiteral(valor) and novo:find("\nlocal%s+" .. nome .. "%s*=") then
+				novo = trocarValor(novo, nome, valor)
+			end
+		end
+		return novo
+	end
+
+	-- troca o script pela versão nova, mantendo as configurações
+	local function atualizar(s, tipo)
+		s.Source = manterConfigs(s.Source, FONTES[tipo])
+	end
+
+	-- cria um script novo com a versão nova
+	local function novoScript(pai, nome, tipo, classe)
+		local s = Instance.new(classe or "Script")
+		s.Name = nome
+		s.Source = FONTES[tipo]
+		s.Parent = pai
+		return s
+	end
+
+	-- lista todos os scripts do projeto com o tipo de cada um
+	local function listarScripts()
+		local lista = {}
+		for _, servico in ipairs({ workspace, ServerScriptService, ServerStorage }) do
+			for _, s in ipairs(servico:GetDescendants()) do
+				local ignorar = s.Name == "CorrigirProjeto" or s.Name == "RelatorioProjeto" or s.Name == "RelatorioCorrecao"
+				if s:IsA("LuaSourceContainer") and not ignorar then
+					table.insert(lista, { obj = s, tipo = tipoDoScript(s) })
+				end
+			end
+		end
+		return lista
+	end
+
+	-- cria uma placa de texto numa peça
+	local function criarPlacaDeTexto(peca, lado)
+		local tela = Instance.new("SurfaceGui")
+		tela.Face = lado
+		tela.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		tela.Parent = peca
+
+		local texto = Instance.new("TextLabel")
+		texto.Size = UDim2.new(1, 0, 1, 0)
+		texto.BackgroundTransparency = 1
+		texto.TextScaled = true
+		texto.Font = Enum.Font.GothamBold
+		texto.TextColor3 = Color3.fromRGB(255, 255, 255)
+		texto.TextStrokeTransparency = 0
+		texto.Text = ""
+		texto.Parent = tela
+	end
+
+	-- cria uma peça ancorada
+	local function novaPeca(pai, nome, tamanho, posicao, cor)
+		local peca = Instance.new("Part")
+		peca.Name = nome
+		peca.Size = tamanho
+		peca.Anchored = true
+		peca.CFrame = posicao
+		peca.Color = cor
+		peca.Parent = pai
+		return peca
+	end
+
+	-- devolve um nome que ainda não existe dentro da pasta (Botao1, Botao2...)
+	local function nomeLivre(pai, prefixo)
+		local numero = 1
+		while pai:FindFirstChild(prefixo .. numero) do
+			numero += 1
+		end
+		return prefixo .. numero
+	end
+
+	-- devolve o ponto do meio de todas as peças da base
+	local function centroDaBase(base)
+		local soma = Vector3.zero
+		local quantidade = 0
+		for _, peca in ipairs(base:GetDescendants()) do
+			if peca:IsA("BasePart") then
+				soma += peca.Position
+				quantidade += 1
+			end
+		end
+		if quantidade == 0 then
+			return CFrame.new(0, 5, 0)
+		end
+		return CFrame.new(soma / quantidade)
+	end
+
+	historico:SetWaypoint("Antes da correção do projeto")
+	linha("CORREÇÃO DO PROJETO - " .. os.date("%d/%m/%Y %H:%M"))
+
+	-- ========================================
+	-- PASTAS E SCRIPTS PRINCIPAIS
+	-- ========================================
+	titulo("PASTAS E SCRIPTS PRINCIPAIS")
+
+	if not pastaTycoons then
+		pastaTycoons = Instance.new("Folder")
+		pastaTycoons.Name = "Tycoons"
+		pastaTycoons.Parent = workspace
+		corrigido("pasta Tycoons criada no Workspace")
+		manual("coloque as bases (Tycoon1, Tycoon2...) dentro da pasta Tycoons")
+	end
+
+	if not blocos then
+		blocos = Instance.new("Folder")
+		blocos.Name = "Blocos"
+		blocos.Parent = ServerStorage
+		corrigido("pasta Blocos criada no ServerStorage")
+	end
+
+	local economia = ServerScriptService:FindFirstChild("Economia")
+	if economia and not economia:IsA("ModuleScript") then
+		economia.Name = "EconomiaAntiga"
+		if economia:IsA("Script") then economia.Enabled = false end
+		manual("havia um Script chamado Economia no lugar do ModuleScript: ele foi renomeado para EconomiaAntiga e desligado (pode apagar)")
+		economia = nil
+	end
+	if not economia then
+		novoScript(ServerScriptService, "Economia", "Economia", "ModuleScript")
+		corrigido("ModuleScript Economia criado no ServerScriptService")
+	elseif not estaAtualizado("Economia", economia.Source) then
+		economia.Source = FONTES.Economia
+		corrigido("Economia atualizado (armazém separado por base)")
+	end
+
+	-- ========================================
+	-- SCRIPTS DO TIPO ERRADO OU NO LUGAR ERRADO
+	-- ========================================
+	titulo("SCRIPTS NO LUGAR ERRADO")
+
+	local temUI = false
+	for _, info in ipairs(listarScripts()) do
+		local s = info.obj
+		local tipo = info.tipo
+
+		-- LocalScript não roda no Workspace: troca por Script
+		if s.ClassName == "LocalScript" and tipo ~= "Outro" and s:IsDescendantOf(workspace) then
+			local novo = Instance.new("Script")
+			novo.Name = s.Name
+			novo.Source = s.Source
+			novo.Parent = s.Parent
+			s:Destroy()
+			s = novo
+			corrigido("LocalScript trocado por Script: " .. nomeCurto(novo))
+		end
+
+		-- gerador de teste antigo
+		if tipo == "GeradorTeste" and s:IsA("Script") and s.Enabled then
+			s.Enabled = false
+			corrigido("gerador de teste desligado: " .. s:GetFullName())
+		end
+
+		-- EconomiaUI
+		if tipo == "EconomiaUI" then
+			temUI = true
+			if not s:IsDescendantOf(ServerScriptService) then
+				s.Parent = ServerScriptService
+				corrigido("EconomiaUI movido para o ServerScriptService")
+			end
+			if not estaAtualizado("EconomiaUI", s.Source) then
+				atualizar(s, "EconomiaUI")
+				corrigido("EconomiaUI atualizado")
+			end
+		end
+
+		-- script que precisa estar numa peça mas está em outro objeto (ex: dentro de um Fire)
+		if precisaDePeca[tipo] and s.Parent and not s.Parent:IsA("BasePart") and s:IsDescendantOf(workspace) then
+			local peca = nil
+			local atual = s.Parent
+			local nivel = 0
+			while atual and nivel < 3 do
+				if atual:IsA("BasePart") then
+					peca = atual
+					break
+				end
+				atual = atual.Parent
+				nivel += 1
+			end
+			if not peca and (tipo == "Botao" or tipo == "BotaoCompra") then
+				local dentro = s.Parent:FindFirstChild(tipo)
+				if dentro and dentro:IsA("BasePart") then
+					peca = dentro
+				end
+			end
+			if peca then
+				local antes = nomeCurto(s)
+				s.Parent = peca
+				corrigido(tipo .. " movido para dentro da peça certa: " .. antes .. " → " .. nomeCurto(peca))
+			else
+				manual(tipo .. " fora de uma peça: " .. nomeCurto(s) .. " (coloque o script dentro da peça)")
+			end
+		end
+	end
+
+	if not temUI then
+		novoScript(ServerScriptService, "EconomiaUI", "EconomiaUI")
+		corrigido("script EconomiaUI criado no ServerScriptService (dinheiro na tela)")
+	end
+
+	-- ========================================
+	-- ORGANIZAÇÃO DA PASTA TYCOONS
+	-- ========================================
+	titulo("ORGANIZAÇÃO DA PASTA TYCOONS")
+
+	local bases = {}
+	local soltos = {}
 	for _, filho in ipairs(pastaTycoons:GetChildren()) do
 		if filho:IsA("Folder") or filho:IsA("Model") then
 			table.insert(bases, filho)
 		else
-			erro(filho.Name .. " está solto na pasta Tycoons (precisa ficar dentro de uma base)")
+			table.insert(soltos, filho)
 		end
 	end
-else
-	erro("falta a pasta Tycoons no Workspace")
-end
-if blocos then ok("ServerStorage.Blocos") else erro("falta a pasta Blocos no ServerStorage") end
-titulo("SCRIPTS PRINCIPAIS")
-local economia = ServerScriptService:FindFirstChild("Economia")
-if economia and economia:IsA("ModuleScript") then
-	if estaAtualizado("Economia", economia.Source) then
-		ok("Economia (ModuleScript)")
-	else
-		erro("Economia desatualizado (sem armazém por base)")
+
+	if #bases == 0 and #soltos > 0 then
+		local base = Instance.new("Folder")
+		base.Name = "Tycoon1"
+		base.Parent = pastaTycoons
+		table.insert(bases, base)
+		corrigido("base Tycoon1 criada dentro da pasta Tycoons")
 	end
-else
-	erro("falta o ModuleScript Economia no ServerScriptService")
-end
-local temUI = false
-for _, info in ipairs(scripts) do
-	if info.tipo == "EconomiaUI" then
-		temUI = true
-		if not info.obj:IsDescendantOf(ServerScriptService) then
-			aviso("EconomiaUI fora do ServerScriptService: " .. info.obj:GetFullName())
-		elseif estaAtualizado("EconomiaUI", info.obj.Source) then
-			ok("EconomiaUI (dinheiro na tela)")
+
+	for _, obj in ipairs(soltos) do
+		if #bases == 1 then
+			obj.Parent = bases[1]
+			corrigido(obj.Name .. " estava solto na pasta Tycoons e foi movido para dentro de " .. bases[1].Name)
 		else
-			aviso("EconomiaUI desatualizado (não apaga a carteira de quem sai)")
+			manual(obj.Name .. " está solto na pasta Tycoons: arraste para dentro da base certa")
 		end
 	end
-	if info.tipo == "GeradorTeste" and info.obj:IsA("Script") and info.obj.Enabled then
-		erro("gerador de teste ligado: " .. info.obj:GetFullName() .. " (desmarque Enabled ou apague)")
-	end
-end
-if not temUI then aviso("falta o script EconomiaUI (dinheiro na tela)") end
-titulo("SCRIPTS NO LUGAR ERRADO")
-local achouLugarErrado = false
-for _, info in ipairs(scripts) do
-	local s = info.obj
-	if s:IsDescendantOf(workspace) and info.tipo ~= "Outro" then
-		if s.ClassName == "LocalScript" then
-			erro("LocalScript não roda no Workspace: " .. nomeCurto(s) .. " (troque por um Script)")
-			achouLugarErrado = true
-		end
-		if precisaDePeca[info.tipo] and not s.Parent:IsA("BasePart") then
-			erro(info.tipo .. " fora de uma peça: " .. nomeCurto(s) .. " (o script precisa ficar dentro da peça)")
-			achouLugarErrado = true
+
+	-- scripts de base que estão fora de qualquer base
+	for _, info in ipairs(listarScripts()) do
+		local s = info.obj
+		if s.Parent and s:IsDescendantOf(workspace) and precisaDeBase[info.tipo] and not baseDe(s) then
+			local peca = s.Parent
+			if peca ~= workspace and #bases == 1 then
+				local antes = peca:GetFullName()
+				peca.Parent = bases[1]
+				corrigido(info.tipo .. " estava fora da base e foi movido para dentro de " .. bases[1].Name .. ": " .. antes)
+			else
+				manual(info.tipo .. " fora de uma base: " .. s:GetFullName() .. " (arraste para dentro da base certa)")
+			end
 		end
 	end
-end
-if not achouLugarErrado then ok("todos os scripts estão no tipo e no lugar certos") end
-titulo("MOLDES DE BLOCO")
-if blocos then
-	if #blocos:GetChildren() == 0 then erro("a pasta Blocos está vazia") end
+
+	-- ========================================
+	-- MOLDES DE BLOCO
+	-- ========================================
+	titulo("MOLDES DE BLOCO")
+
+	if #blocos:GetChildren() == 0 then
+		manual("a pasta ServerStorage.Blocos está vazia: coloque pelo menos um molde (uma Part)")
+	end
 	for _, molde in ipairs(blocos:GetChildren()) do
 		if not molde:IsA("BasePart") then
-			erro(molde.Name .. " não é uma Part (o gerador precisa de Part)")
+			manual(molde.Name .. " em ServerStorage.Blocos não é uma Part (troque por uma Part)")
 		else
-			local scriptBloco = nil
+			local temBloco = false
 			for _, filho in ipairs(molde:GetChildren()) do
-				if filho:IsA("Script") and tipoDoScript(filho) == "Bloco" then scriptBloco = filho end
+				if filho:IsA("Script") and tipoDoScript(filho) == "Bloco" then temBloco = true end
 			end
-			if scriptBloco then
-				local valor = scriptBloco.Source:match("\nlocal%s+valor%s*=%s*([^%s%-]+)") or "?"
-				ok(molde.Name .. ": vale " .. valor)
-			else
-				erro(molde.Name .. ": sem o script Bloco (não vale dinheiro)")
+			if not temBloco then
+				novoScript(molde, "Bloco", "Bloco")
+				corrigido("script Bloco colocado em " .. molde.Name .. " (vale 5, mude o valor se quiser)")
 			end
 		end
 	end
-end
-local totais = { botoes = 0, lojas = 0, geradores = 0, esteiras = 0, upgrades = 0, destinos = 0, portas = 0, placas = 0, coletores = 0, paineis = 0 }
-local resumoBases = {}
-local botoesGratis = 0
-local botoesNomePadrao = 0
-for _, base in ipairs(bases) do
-	titulo("BASE: " .. base.Name)
-	local porTipo = {}
-	for _, info in ipairs(scripts) do
-		if baseDe(info.obj) == base then
-			porTipo[info.tipo] = porTipo[info.tipo] or {}
-			table.insert(porTipo[info.tipo], info.obj)
+
+	-- ========================================
+	-- CADA BASE
+	-- ========================================
+	for _, base in ipairs(bases) do
+		titulo("BASE: " .. base.Name)
+
+		-- peças com nome errado
+		for _, obj in ipairs(base:GetDescendants()) do
+			if obj:IsA("BasePart") then
+				local minusculo = obj.Name:lower()
+				local certo = nil
+				if minusculo == "botao" or minusculo == "botão" then certo = "Botao" end
+				if minusculo == "botaodono" or minusculo == "botãodono" then certo = "BotaoDono" end
+				if minusculo == "botaocompra" or minusculo == "botãocompra" then certo = "BotaoCompra" end
+				if minusculo == "alavanca" then certo = "Alavanca" end
+				if certo and obj.Name ~= certo then
+					local antigo = obj.Name
+					obj.Name = certo
+					corrigido("peça \"" .. antigo .. "\" renomeada para " .. certo .. ": " .. nomeCurto(obj))
+				end
+			end
 		end
-	end
-	local function lista(tipo)
-		return porTipo[tipo] or {}
-	end
-	linha("  Dono da base:")
-	local botaoDono = base:FindFirstChild("BotaoDono")
-	if botaoDono and botaoDono:IsA("BasePart") then
+
+		-- pastas chamadas "Botao" (confundem com a peça Botao)
+		for _, obj in ipairs(base:GetDescendants()) do
+			if obj.Name == "Botao" and (obj:IsA("Folder") or obj:IsA("Model")) then
+				local novo = nomeLivre(obj.Parent, "Botao")
+				obj.Name = novo
+				corrigido("pasta chamada \"Botao\" renomeada para " .. novo .. " (só a peça pode se chamar Botao)")
+			end
+		end
+
+		-- BotaoDono
+		local botaoDono = base:FindFirstChild("BotaoDono")
+		if botaoDono and not botaoDono:IsA("BasePart") then botaoDono = nil end
+		for _, obj in ipairs(base:GetDescendants()) do
+			if obj.Name == "BotaoDono" and obj:IsA("BasePart") and obj.Parent ~= base then
+				if not botaoDono then
+					obj.Parent = base
+					botaoDono = obj
+					corrigido("BotaoDono movido para a raiz da base")
+				else
+					manual("BotaoDono a mais em " .. nomeCurto(obj) .. " (apague o que sobrou)")
+				end
+			end
+		end
+		if not botaoDono then
+			botaoDono = novaPeca(base, "BotaoDono", Vector3.new(6, 1, 6), centroDaBase(base), Color3.fromRGB(0, 170, 255))
+			corrigido("BotaoDono criado no meio da base")
+			manual("posicione o BotaoDono de " .. base.Name .. " na entrada da base")
+		end
+
 		local scriptDono = nil
 		for _, filho in ipairs(botaoDono:GetChildren()) do
 			if filho:IsA("Script") and tipoDoScript(filho) == "BotaoDono" then scriptDono = filho end
 		end
 		if not scriptDono then
-			erro("BotaoDono sem o script BotaoDono")
-		elseif estaAtualizado("BotaoDono", scriptDono.Source) then
-			ok("BotaoDono com script")
-		else
-			aviso("BotaoDono com a versão antiga (não some ao pegar a base)")
+			novoScript(botaoDono, "BotaoDono", "BotaoDono")
+			corrigido("script BotaoDono colocado no BotaoDono")
+		elseif not estaAtualizado("BotaoDono", scriptDono.Source) then
+			atualizar(scriptDono, "BotaoDono")
+			corrigido("BotaoDono atualizado (agora some quando alguém pega a base)")
 		end
-	else
-		erro("falta a peça BotaoDono solta dentro da base")
-	end
-	for _, obj in ipairs(base:GetDescendants()) do
-		if obj.Name == "BotaoDono" and obj:IsA("BasePart") and obj.Parent ~= base then
-			erro("BotaoDono dentro de outra pasta: " .. nomeCurto(obj) .. " (precisa ficar solto na base)")
+		if not botaoDono:FindFirstChildWhichIsA("TextLabel", true) then
+			criarPlacaDeTexto(botaoDono, Enum.NormalId.Top)
+			corrigido("placa de texto criada no BotaoDono")
 		end
-	end
-	for _, s in ipairs(lista("PlacaDono")) do
-		if estaAtualizado("PlacaDono", s.Source) then
-			ok("PlacaDono " .. nomeCurto(s.Parent))
-		else
-			aviso("PlacaDono " .. nomeCurto(s.Parent) .. ": versão antiga (sem as configurações de texto)")
-		end
-		if s.Parent.Parent ~= base then
-			aviso("PlacaDono dentro de outra pasta: " .. nomeCurto(s.Parent) .. " (só aparece depois de uma compra)")
-		end
-	end
-	if #lista("PlacaDono") == 0 then aviso("base sem PlacaDono") end
-	for _, obj in ipairs(base:GetDescendants()) do
-		if obj.Name == "Botao" and (obj:IsA("Folder") or obj:IsA("Model")) then
-			erro("pasta chamada \"Botao\": " .. nomeCurto(obj) .. " (só a peça pode se chamar Botao, renomeie a pasta)")
-		end
-		if obj:IsA("BasePart") then
-			local minusculo = obj.Name:lower()
-			if (minusculo == "botao" or minusculo == "botão") and obj.Name ~= "Botao" then
-				erro("peça com nome errado: " .. nomeCurto(obj) .. " (precisa ser exatamente Botao)")
-			end
-			if (minusculo == "botaocompra" or minusculo == "botãocompra") and obj.Name ~= "BotaoCompra" then
-				erro("peça com nome errado: " .. nomeCurto(obj) .. " (precisa ser exatamente BotaoCompra)")
-			end
-		end
-	end
-	linha("  Botões de compra (pasta | nome | preço | situação):")
-	local qtdBotoes = 0
-	for _, obj in ipairs(base:GetDescendants()) do
-		if obj:IsA("BasePart") and obj.Name == "Botao" then
-			qtdBotoes += 1
-			local pasta = obj.Parent
-			local onde = nomeCurto(pasta)
-			local scriptBotao = nil
-			for _, filho in ipairs(obj:GetChildren()) do
-				if filho:IsA("Script") and tipoDoScript(filho) == "Botao" then scriptBotao = filho end
-			end
-			if not scriptBotao then
-				erro(onde .. ": botão sem script de compra")
-			else
-				local src = scriptBotao.Source
-				local preco = src:match("\nlocal%s+preco%s*=%s*([^%s%-]+)") or "?"
-				local nome = src:match('\nlocal%s+nomeDoItem%s*=%s*"([^"]*)"') or "(sem nome)"
-				local situacao = "atualizado"
-				if not estaAtualizado("Botao", src) then
-					situacao = "DESATUALIZADO"
-				elseif not tem(src, "Touched:Connect(tentarComprar)") then
-					situacao = "INCOMPLETO (colado pela metade)"
+
+		-- botões de compra
+		for _, obj in ipairs(base:GetDescendants()) do
+			if obj:IsA("BasePart") and obj.Name == "Botao" then
+				if obj.Parent == base then
+					local pasta = Instance.new("Folder")
+					pasta.Name = nomeLivre(base, "Botao")
+					pasta.Parent = base
+					obj.Parent = pasta
+					corrigido("Botao solto na base colocado dentro da pasta " .. pasta.Name)
+					manual("coloque dentro de " .. nomeCurto(pasta) .. " os itens que esse botão vende")
 				end
-				if not scriptBotao.Enabled then situacao = situacao .. ", DESLIGADO" end
-				local texto = onde .. "  |  " .. nome .. "  |  " .. preco .. "  |  " .. situacao
-				if situacao == "atualizado" then ok(texto) else erro(texto) end
-				if preco == "0" then botoesGratis += 1 end
-				if nome == "Gerador" then botoesNomePadrao += 1 end
-			end
-			if pasta == base then
-				erro(onde .. ": Botao solto direto na base (precisa estar dentro de uma pasta de compra)")
-			end
-			local iguais = 0
-			for _, irmao in ipairs(pasta:GetChildren()) do
-				if irmao.Name == "Botao" then iguais += 1 end
-			end
-			if iguais > 1 then aviso(onde .. ": " .. iguais .. " objetos chamados Botao na mesma pasta") end
-			if not temPai(obj) then aviso(onde .. ": botão sem botão pai (aparece mesmo sem dono)") end
-		end
-	end
-	if qtdBotoes == 0 then aviso("nenhum botão de compra") end
-	linha("  Lojas de item (pasta | nome | preço | itens):")
-	local qtdLojas = 0
-	for _, obj in ipairs(base:GetDescendants()) do
-		if obj:IsA("BasePart") and obj.Name == "BotaoCompra" then
-			qtdLojas += 1
-			local pasta = obj.Parent
-			local onde = nomeCurto(pasta)
-			local scriptLoja = nil
-			for _, filho in ipairs(obj:GetChildren()) do
-				if filho:IsA("Script") and tipoDoScript(filho) == "BotaoCompra" then scriptLoja = filho end
-			end
-			local qtdTools = 0
-			for _, item in ipairs(pasta:GetDescendants()) do
-				if item:IsA("Tool") then qtdTools += 1 end
-			end
-			if pasta.Name ~= "BotaoCompra" then aviso(onde .. ": a pasta da loja precisa se chamar BotaoCompra") end
-			if pasta == base then erro(onde .. ": BotaoCompra solto direto na base (precisa estar dentro da pasta BotaoCompra)") end
-			if not scriptLoja then
-				erro(onde .. ": loja sem o script BotaoCompra")
-			else
-				local src = scriptLoja.Source
-				local preco = src:match("\nlocal%s+preco%s*=%s*([^%s%-]+)") or "?"
-				local nome = src:match('\nlocal%s+nomeDoItem%s*=%s*"([^"]*)"') or "(sem nome)"
-				local texto = onde .. "  |  " .. nome .. "  |  " .. preco .. "  |  " .. qtdTools .. " item(ns)"
-				if not scriptLoja.Enabled then
-					erro(texto .. "  |  script DESLIGADO")
-				elseif qtdTools == 0 then
-					aviso(texto .. "  |  nenhuma Tool na pasta")
+
+				local scriptBotao = nil
+				for _, filho in ipairs(obj:GetChildren()) do
+					if filho:IsA("Script") and tipoDoScript(filho) == "Botao" then scriptBotao = filho end
+				end
+				if not scriptBotao then
+					novoScript(obj, "Script", "Botao")
+					corrigido("script de compra colocado em " .. nomeCurto(obj.Parent) .. " (confira preco e nomeDoItem)")
 				else
-					ok(texto)
+					if not estaAtualizado("Botao", scriptBotao.Source) then
+						atualizar(scriptBotao, "Botao")
+						corrigido("botão atualizado (preço e nome mantidos): " .. nomeCurto(obj.Parent))
+					end
+					if not scriptBotao.Enabled then
+						scriptBotao.Enabled = true
+						corrigido("script do botão religado: " .. nomeCurto(obj.Parent))
+					end
 				end
 			end
-			if not temPai(obj) then aviso(onde .. ": loja sem botão pai (aparece mesmo sem dono)") end
 		end
-	end
-	if qtdLojas == 0 then linha("    nenhuma") end
-	linha("  Máquinas:")
-	for _, s in ipairs(lista("Gerador")) do
-		local onde = nomeCurto(s.Parent)
-		local tipoBloco = s.Source:match('\nlocal%s+tipoDeBloco%s*=%s*"([^"]*)"')
-		if tipoBloco and blocos and blocos:FindFirstChild(tipoBloco) then
-			ok("Gerador " .. onde .. " solta " .. tipoBloco)
-		else
-			erro("Gerador " .. onde .. ": molde \"" .. tostring(tipoBloco) .. "\" não existe em ServerStorage.Blocos")
-		end
-		if not s.Enabled then aviso("Gerador " .. onde .. ": script desligado (Enabled desmarcado)") end
-	end
-	if #lista("Gerador") == 0 then aviso("base sem Gerador") end
-	local function conferir(tipo)
-		for _, s in ipairs(lista(tipo)) do
-			local onde = nomeCurto(s.Parent)
-			if estaAtualizado(tipo, s.Source) then
-				ok(tipo .. " " .. onde)
-			else
-				erro(tipo .. " " .. onde .. ": script DESATUALIZADO")
-			end
-			if s:IsA("Script") and not s.Enabled then
-				aviso(tipo .. " " .. onde .. ": script desligado (Enabled desmarcado)")
-			end
-		end
-	end
-	conferir("Esteira")
-	conferir("Upgrade")
-	conferir("DestinoFinal")
-	conferir("Coletor")
-	conferir("PainelArmazem")
-	if #lista("DestinoFinal") == 0 then aviso("base sem DestinoFinal") end
-	if #lista("Coletor") == 0 then erro("base sem Coletor") end
-	if #lista("PainelArmazem") == 0 then aviso("base sem PainelArmazem") end
-	for _, s in ipairs(lista("PortaLaser")) do
-		local pasta = s.Parent
-		local onde = nomeCurto(pasta)
-		if not estaAtualizado("PortaLaser", s.Source) then
-			aviso("PortaLaser " .. onde .. ": versão antiga (não liga e desliga partículas e luzes)")
-		end
-		if not (pasta:IsA("Folder") or pasta:IsA("Model")) then
-			erro("PortaLaser " .. onde .. ": o script precisa ficar direto na pasta PortaLaser")
-		else
-			local alavanca = pasta:FindFirstChild("Alavanca")
-			if not alavanca or not alavanca:IsA("BasePart") then
-				erro("PortaLaser " .. onde .. ": falta a peça Alavanca")
-			elseif not alavanca:FindFirstChildWhichIsA("ProximityPrompt") then
-				aviso("PortaLaser " .. onde .. ": Alavanca sem ProximityPrompt criado no Studio")
-			end
-			local qtdLasers = 0
-			for _, peca in ipairs(pasta:GetDescendants()) do
-				if peca:IsA("BasePart") and peca ~= alavanca and not (alavanca and peca:IsDescendantOf(alavanca)) then
-					qtdLasers += 1
+
+		-- outros scripts da base
+		local contagem = {}
+		for _, s in ipairs(base:GetDescendants()) do
+			if s:IsA("LuaSourceContainer") and s.Parent then
+				local tipo = tipoDoScript(s)
+				contagem[tipo] = (contagem[tipo] or 0) + 1
+
+				if (tipo == "DestinoFinal" or tipo == "Coletor" or tipo == "PainelArmazem" or tipo == "PlacaDono") and not estaAtualizado(tipo, s.Source) then
+					atualizar(s, tipo)
+					corrigido(tipo .. " atualizado: " .. nomeCurto(s.Parent))
+				end
+
+				if tipo == "PainelArmazem" and s.Parent:IsA("BasePart") and not s.Parent:FindFirstChildWhichIsA("TextLabel", true) then
+					criarPlacaDeTexto(s.Parent, Enum.NormalId.Front)
+					corrigido("placa de texto criada no painel: " .. nomeCurto(s.Parent))
+				end
+
+				if s:IsA("Script") and not s.Enabled and tipo ~= "Outro" and tipo ~= "GeradorTeste" then
+					s.Enabled = true
+					corrigido("script religado: " .. nomeCurto(s))
+				end
+
+				if tipo == "Gerador" then
+					local tipoBloco = s.Source:match('\nlocal%s+tipoDeBloco%s*=%s*"([^"]*)"')
+					if tipoBloco and not blocos:FindFirstChild(tipoBloco) then
+						local certo = nil
+						for _, molde in ipairs(blocos:GetChildren()) do
+							if molde.Name:lower() == tipoBloco:lower() then certo = molde.Name end
+						end
+						if certo then
+							s.Source = trocarValor(s.Source, "tipoDeBloco", '"' .. certo .. '"')
+							corrigido("Gerador " .. nomeCurto(s.Parent) .. ": molde corrigido para " .. certo)
+						else
+							manual("Gerador " .. nomeCurto(s.Parent) .. ": o molde \"" .. tipoBloco .. "\" não existe em ServerStorage.Blocos")
+						end
+					end
+				end
+
+				if tipo == "PortaLaser" then
+					local alavanca = s.Parent:FindFirstChild("Alavanca")
+					if alavanca and alavanca:IsA("BasePart") then
+						if not alavanca:FindFirstChildWhichIsA("ProximityPrompt") then
+							local prompt = Instance.new("ProximityPrompt")
+							prompt.Parent = alavanca
+							corrigido("ProximityPrompt criado na Alavanca: " .. nomeCurto(s.Parent))
+						end
+					else
+						manual("PortaLaser " .. nomeCurto(s.Parent) .. ": falta a peça Alavanca")
+					end
+				end
+
+				if tipo == "Outro" and not s:IsA("ModuleScript") then
+					local caminho = nomeCurto(s)
+					local limpo = s.Source:gsub("%s", "")
+					if limpo == "" or limpo == 'print("Helloworld!")' then
+						s:Destroy()
+						corrigido("script vazio apagado: " .. caminho)
+					else
+						local juntoDeScriptDoJogo = false
+						for _, irmao in ipairs(s.Parent:GetChildren()) do
+							if irmao ~= s and irmao:IsA("LuaSourceContainer") and tipoDoScript(irmao) ~= "Outro" then
+								juntoDeScriptDoJogo = true
+							end
+						end
+						if juntoDeScriptDoJogo and s:IsA("Script") and s.Enabled then
+							s.Enabled = false
+							corrigido("script desconhecido desligado (estava junto de um script do jogo): " .. caminho .. " (se não fizer falta, apague)")
+						else
+							manual("script desconhecido: " .. caminho .. " (pode ser da Toolbox, confira se é seguro)")
+						end
+					end
 				end
 			end
-			if qtdLasers == 0 then
-				erro("PortaLaser " .. onde .. ": nenhum laser na pasta")
-			else
-				ok("PortaLaser " .. onde .. ": " .. qtdLasers .. " laser(s)")
+		end
+
+		-- peças que faltam
+		local referencia = botaoDono.CFrame
+
+		if not contagem.Coletor then
+			local coletor = novaPeca(base, "Coletor", Vector3.new(3, 3, 3), referencia * CFrame.new(-10, 2, 0), Color3.fromRGB(255, 200, 0))
+			coletor.Shape = Enum.PartType.Ball
+			novoScript(coletor, "Coletor", "Coletor")
+			corrigido("Coletor criado ao lado do BotaoDono")
+			manual("posicione o Coletor de " .. base.Name .. " onde quiser")
+		end
+
+		if not contagem.PainelArmazem then
+			local painel = novaPeca(base, "PainelArmazem", Vector3.new(6, 3, 0.5), referencia * CFrame.new(-10, 6, 0), Color3.fromRGB(30, 30, 30))
+			criarPlacaDeTexto(painel, Enum.NormalId.Front)
+			novoScript(painel, "PainelArmazem", "PainelArmazem")
+			corrigido("PainelArmazem criado em cima do Coletor")
+			manual("posicione o PainelArmazem de " .. base.Name .. " (o texto fica na frente da peça)")
+		end
+
+		if not contagem.PlacaDono then
+			local placa = novaPeca(base, "PlacaDono", Vector3.new(8, 4, 0.5), referencia * CFrame.new(0, 6, 0), Color3.fromRGB(30, 30, 30))
+			novoScript(placa, "PlacaDono", "PlacaDono")
+			corrigido("PlacaDono criada em cima do BotaoDono")
+			manual("posicione a PlacaDono de " .. base.Name .. " com espaço livre na frente (é onde o dono renasce)")
+		end
+
+		if not contagem.DestinoFinal then
+			manual("base " .. base.Name .. " sem DestinoFinal: coloque um no fim da esteira")
+		end
+		if not contagem.Gerador then
+			manual("base " .. base.Name .. " sem Gerador")
+		end
+
+		-- botões grátis e com o nome padrão
+		local gratis = {}
+		local semNome = {}
+		for _, s in ipairs(base:GetDescendants()) do
+			if s:IsA("Script") and tipoDoScript(s) == "Botao" then
+				local preco = s.Source:match("\nlocal%s+preco%s*=%s*([^%s%-]+)")
+				local nome = s.Source:match('\nlocal%s+nomeDoItem%s*=%s*"([^"]*)"')
+				if preco == "0" then table.insert(gratis, s.Parent.Parent.Name) end
+				if nome == "Gerador" then table.insert(semNome, s.Parent.Parent.Name) end
 			end
 		end
-	end
-	for _, s in ipairs(lista("Outro")) do
-		aviso("script desconhecido: " .. nomeCurto(s) .. " (pode ser da Toolbox, confira se é seguro)")
-	end
-	for _, s in ipairs(lista("GeradorTeste")) do
-		erro("gerador de teste dentro da base: " .. nomeCurto(s))
-	end
-	linha("  Objetos por tipo:")
-	local classes = {}
-	for _, obj in ipairs(base:GetDescendants()) do
-		classes[obj.ClassName] = (classes[obj.ClassName] or 0) + 1
-	end
-	local nomes = {}
-	for nome in pairs(classes) do table.insert(nomes, nome) end
-	table.sort(nomes, function(a, b) return classes[a] > classes[b] end)
-	local grupo = {}
-	for i, nome in ipairs(nomes) do
-		table.insert(grupo, nome .. ": " .. classes[nome])
-		if #grupo == 4 or i == #nomes then
-			linha("    " .. table.concat(grupo, "  |  "))
-			grupo = {}
+		if #gratis > 0 then
+			manual("botões grátis (preço 0): " .. table.concat(gratis, ", ") .. " (mude o preco se não for de propósito)")
+		end
+		if #semNome > 0 then
+			manual("botões com o nome padrão \"Gerador\": " .. table.concat(semNome, ", ") .. " (troque o nomeDoItem de cada um)")
 		end
 	end
-	totais.botoes += qtdBotoes
-	totais.lojas += qtdLojas
-	totais.geradores += #lista("Gerador")
-	totais.esteiras += #lista("Esteira")
-	totais.upgrades += #lista("Upgrade")
-	totais.destinos += #lista("DestinoFinal")
-	totais.portas += #lista("PortaLaser")
-	totais.placas += #lista("PlacaDono")
-	totais.coletores += #lista("Coletor")
-	totais.paineis += #lista("PainelArmazem")
-	local temPlaca = "não"
-	if #lista("PlacaDono") > 0 then temPlaca = "sim" end
-	table.insert(resumoBases, string.format("  %s: %d botões, %d lojas, %d geradores, %d esteiras, %d upgrades, %d destinos, %d portas laser, placa do dono: %s", base.Name, qtdBotoes, qtdLojas, #lista("Gerador"), #lista("Esteira"), #lista("Upgrade"), #lista("DestinoFinal"), #lista("PortaLaser"), temPlaca))
-end
-if pastaTycoons and #bases == 0 then erro("nenhuma base (pasta) dentro de Tycoons") end
-titulo("FORA DAS BASES")
-local achouFora = false
-for _, info in ipairs(scripts) do
-	if info.obj:IsDescendantOf(workspace) and precisaBase[info.tipo] and not baseDe(info.obj) then
-		erro(info.tipo .. " fora de uma base: " .. info.obj:GetFullName())
-		achouFora = true
+
+	-- ========================================
+	-- RESULTADO
+	-- ========================================
+	historico:SetWaypoint("Depois da correção do projeto")
+	linha("")
+	linha(string.format("TOTAL: %d corrigido(s) automaticamente e %d para fazer à mão", corrigidos, manuais))
+	linha("Apague o ModuleScript CorrigirProjeto e rode a verificação de novo.")
+
+	local textos = {}
+	for _, item in ipairs(linhas) do
+		if item[1] == "info" then print(item[2]) else warn(item[2]) end
+		table.insert(textos, item[2])
 	end
+
+	local relatorio = ServerStorage:FindFirstChild("RelatorioCorrecao")
+	if relatorio then relatorio:Destroy() end
+	relatorio = Instance.new("Script")
+	relatorio.Name = "RelatorioCorrecao"
+	relatorio.Enabled = false
+	relatorio.Source = "--[==[\n" .. table.concat(textos, "\n") .. "\n]==]"
+	relatorio.Parent = ServerStorage
 end
-if not achouFora then ok("nenhum script de base solto fora das bases") end
-titulo("RESUMO")
-linha("  Bases: " .. #bases)
-linha("  Botões de compra: " .. totais.botoes .. "  |  Lojas de item: " .. totais.lojas)
-linha("  Geradores: " .. totais.geradores .. "  |  Esteiras: " .. totais.esteiras .. "  |  Upgrades: " .. totais.upgrades)
-linha("  Destinos finais: " .. totais.destinos .. "  |  Coletores: " .. totais.coletores .. "  |  Painéis: " .. totais.paineis)
-linha("  Portas laser: " .. totais.portas .. "  |  Placas do dono: " .. totais.placas)
-if blocos then linha("  Moldes de bloco: " .. #blocos:GetChildren()) end
-linha("")
-linha("  Por base:")
-for _, texto in ipairs(resumoBases) do linha(texto) end
-linha("")
-if botoesGratis > 0 then aviso(botoesGratis .. " botão(ões) com preço 0 (grátis). Era só para teste?") end
-if botoesNomePadrao > 0 then aviso(botoesNomePadrao .. " botão(ões) com o nome padrão \"Gerador\". Confira os nomes.") end
-if erros == 0 and avisos == 0 then linha("  TUDO CERTO! O projeto está funcionando como deveria.") end
-linha(string.format("  TOTAL: %d erro(s) e %d aviso(s)", erros, avisos))
-local textos = {}
-for _, item in ipairs(linhas) do
-	if item[1] == "info" then print(item[2]) else warn(item[2]) end
-	table.insert(textos, item[2])
-end
-local relatorio = ServerStorage:FindFirstChild("RelatorioProjeto")
-if relatorio then relatorio:Destroy() end
-relatorio = Instance.new("Script")
-relatorio.Name = "RelatorioProjeto"
-relatorio.Enabled = false
-relatorio.Source = "--[==[\n" .. table.concat(textos, "\n") .. "\n]==]"
-relatorio.Parent = ServerStorage
