@@ -1,3 +1,10 @@
+comando para usar o corrigirprojeto
+
+require(game.ServerStorage.CorrigirProjeto)()
+
+
+
+
 -- Comando para trocar todos os botoes
 -- salve uma cópia do jogo (File → Save to File As)
 -- e feche todos os scripts abertos.
