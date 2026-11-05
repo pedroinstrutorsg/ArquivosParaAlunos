@@ -1,0 +1,449 @@
+local ServerScriptService = game:GetService("ServerScriptService")
+local ServerStorage = game:GetService("ServerStorage")
+local pastaTycoons = workspace:FindFirstChild("Tycoons")
+local blocos = ServerStorage:FindFirstChild("Blocos")
+local linhas = {}
+local erros = 0
+local avisos = 0
+local function linha(texto)
+	table.insert(linhas, { "info", texto })
+end
+local function ok(texto)
+	table.insert(linhas, { "info", "  [OK] " .. texto })
+end
+local function aviso(texto)
+	avisos += 1
+	table.insert(linhas, { "aviso", "  [AVISO] " .. texto })
+end
+local function erro(texto)
+	erros += 1
+	table.insert(linhas, { "erro", "  [ERRO] " .. texto })
+end
+local function titulo(texto)
+	table.insert(linhas, { "info", "" })
+	table.insert(linhas, { "info", "==== " .. texto .. " ====" })
+end
+local function tem(texto, trecho)
+	return texto:find(trecho, 1, true) ~= nil
+end
+local function nomeCurto(obj)
+	local nome = obj:GetFullName():gsub("^Workspace%.Tycoons%.", "")
+	return nome
+end
+local function baseDe(obj)
+	if not pastaTycoons then return nil end
+	local atual = obj
+	while atual and atual.Parent ~= pastaTycoons do
+		atual = atual.Parent
+	end
+	if atual and (atual:IsA("Folder") or atual:IsA("Model")) then return atual end
+	return nil
+end
+local function tipoDoScript(s)
+	local src = s.Source
+	if s:IsA("ModuleScript") then
+		if tem(src, "carteiras") and tem(src, "adicionarAoArmazem") then return "Economia" end
+		return "Outro"
+	end
+	if tem(src, "entregarItens") then return "BotaoCompra" end
+	if tem(src, "tentarComprar") or tem(src, "jaComprado") then return "Botao" end
+	if tem(src, "tocarLaser") then return "PortaLaser" end
+	if tem(src, "levarParaPlaca") or tem(src, "renascerNaPlaca") then return "PlacaDono" end
+	if tem(src, 'SetAttribute("Dono"') then return "BotaoDono" end
+	if tem(src, "coletarParaJogador") then return "Coletor" end
+	if tem(src, 'SetAttribute("Valor", nil)') then return "DestinoFinal" end
+	if tem(src, "aplicarEfeito") then return "Upgrade" end
+	if tem(src, "criarBloco") then return "Gerador" end
+	if tem(src, "dinheiroPorCiclo") then return "GeradorTeste" end
+	if tem(src, "AssemblyLinearVelocity") then return "Esteira" end
+	if tem(src, "leaderstats") then return "EconomiaUI" end
+	if tem(src, "prefixo") and tem(src, "rmazem") then return "PainelArmazem" end
+	if tem(src, 'SetAttribute("Valor"') and tem(src, "Debris") then return "Bloco" end
+	return "Outro"
+end
+local function estaAtualizado(tipo, src)
+	if tipo == "Botao" then return tem(src, "nomesDeBotao") and tem(src, "ehDono") and tem(src, "criarTexto") end
+	if tipo == "BotaoDono" then return tem(src, "esconderAoPegar") end
+	if tipo == "DestinoFinal" then return tem(src, "adicionarAoArmazem(tycoon") end
+	if tipo == "Coletor" then return tem(src, "coletarParaJogador(tycoon") end
+	if tipo == "PainelArmazem" then return tem(src, "pegarArmazem(tycoon") end
+	if tipo == "PortaLaser" then return tem(src, "efeitosLaser") end
+	if tipo == "PlacaDono" then return tem(src, "tamanhoDoTexto") end
+	if tipo == "EconomiaUI" then return tem(src, "PlayerRemoving") end
+	if tipo == "Economia" then return tem(src, "tycoonDoJogador") end
+	return true
+end
+local function temPai(botao)
+	local atual = botao.Parent and botao.Parent.Parent
+	while atual and atual ~= game do
+		local outro = atual:FindFirstChild("Botao") or atual:FindFirstChild("BotaoCompra") or atual:FindFirstChild("BotaoDono")
+		if outro and outro:IsA("BasePart") then return true end
+		atual = atual.Parent
+	end
+	return false
+end
+local precisaDePeca = { Botao = true, BotaoCompra = true, BotaoDono = true, Gerador = true, Esteira = true, Upgrade = true, DestinoFinal = true, Coletor = true, PainelArmazem = true, PlacaDono = true }
+local precisaBase = { Botao = true, BotaoCompra = true, BotaoDono = true, Coletor = true, DestinoFinal = true, PainelArmazem = true, PortaLaser = true, PlacaDono = true }
+local ignorados = { CorrigirProjeto = true, RelatorioProjeto = true, RelatorioCorrecao = true }
+local scripts = {}
+for _, servico in ipairs({ workspace, ServerScriptService, ServerStorage }) do
+	for _, s in ipairs(servico:GetDescendants()) do
+		if s:IsA("LuaSourceContainer") and not ignorados[s.Name] then
+			table.insert(scripts, { obj = s, tipo = tipoDoScript(s) })
+		end
+	end
+end
+linha("RELATÓRIO DO PROJETO - " .. os.date("%d/%m/%Y %H:%M"))
+titulo("PASTAS PRINCIPAIS")
+local bases = {}
+if pastaTycoons then
+	ok("Workspace.Tycoons")
+	for _, filho in ipairs(pastaTycoons:GetChildren()) do
+		if filho:IsA("Folder") or filho:IsA("Model") then
+			table.insert(bases, filho)
+		else
+			erro(filho.Name .. " está solto na pasta Tycoons (precisa ficar dentro de uma base)")
+		end
+	end
+else
+	erro("falta a pasta Tycoons no Workspace")
+end
+if blocos then ok("ServerStorage.Blocos") else erro("falta a pasta Blocos no ServerStorage") end
+titulo("SCRIPTS PRINCIPAIS")
+local economia = ServerScriptService:FindFirstChild("Economia")
+if economia and economia:IsA("ModuleScript") then
+	if estaAtualizado("Economia", economia.Source) then
+		ok("Economia (ModuleScript)")
+	else
+		erro("Economia desatualizado (sem armazém por base)")
+	end
+else
+	erro("falta o ModuleScript Economia no ServerScriptService")
+end
+local temUI = false
+for _, info in ipairs(scripts) do
+	if info.tipo == "EconomiaUI" then
+		temUI = true
+		if not info.obj:IsDescendantOf(ServerScriptService) then
+			aviso("EconomiaUI fora do ServerScriptService: " .. info.obj:GetFullName())
+		elseif estaAtualizado("EconomiaUI", info.obj.Source) then
+			ok("EconomiaUI (dinheiro na tela)")
+		else
+			aviso("EconomiaUI desatualizado (não apaga a carteira de quem sai)")
+		end
+	end
+	if info.tipo == "GeradorTeste" and info.obj:IsA("Script") and info.obj.Enabled then
+		erro("gerador de teste ligado: " .. info.obj:GetFullName() .. " (desmarque Enabled ou apague)")
+	end
+end
+if not temUI then aviso("falta o script EconomiaUI (dinheiro na tela)") end
+titulo("SCRIPTS NO LUGAR ERRADO")
+local achouLugarErrado = false
+for _, info in ipairs(scripts) do
+	local s = info.obj
+	if s:IsDescendantOf(workspace) and info.tipo ~= "Outro" then
+		if s.ClassName == "LocalScript" then
+			erro("LocalScript não roda no Workspace: " .. nomeCurto(s) .. " (troque por um Script)")
+			achouLugarErrado = true
+		end
+		if precisaDePeca[info.tipo] and not s.Parent:IsA("BasePart") then
+			erro(info.tipo .. " fora de uma peça: " .. nomeCurto(s) .. " (o script precisa ficar dentro da peça)")
+			achouLugarErrado = true
+		end
+	end
+end
+if not achouLugarErrado then ok("todos os scripts estão no tipo e no lugar certos") end
+titulo("MOLDES DE BLOCO")
+if blocos then
+	if #blocos:GetChildren() == 0 then erro("a pasta Blocos está vazia") end
+	for _, molde in ipairs(blocos:GetChildren()) do
+		if not molde:IsA("BasePart") then
+			erro(molde.Name .. " não é uma Part (o gerador precisa de Part)")
+		else
+			local scriptBloco = nil
+			for _, filho in ipairs(molde:GetChildren()) do
+				if filho:IsA("Script") and tipoDoScript(filho) == "Bloco" then scriptBloco = filho end
+			end
+			if scriptBloco then
+				local valor = scriptBloco.Source:match("\nlocal%s+valor%s*=%s*([^%s%-]+)") or "?"
+				ok(molde.Name .. ": vale " .. valor)
+			else
+				erro(molde.Name .. ": sem o script Bloco (não vale dinheiro)")
+			end
+		end
+	end
+end
+local totais = { botoes = 0, lojas = 0, geradores = 0, esteiras = 0, upgrades = 0, destinos = 0, portas = 0, placas = 0, coletores = 0, paineis = 0 }
+local resumoBases = {}
+local botoesGratis = 0
+local botoesNomePadrao = 0
+for _, base in ipairs(bases) do
+	titulo("BASE: " .. base.Name)
+	local porTipo = {}
+	for _, info in ipairs(scripts) do
+		if baseDe(info.obj) == base then
+			porTipo[info.tipo] = porTipo[info.tipo] or {}
+			table.insert(porTipo[info.tipo], info.obj)
+		end
+	end
+	local function lista(tipo)
+		return porTipo[tipo] or {}
+	end
+	linha("  Dono da base:")
+	local botaoDono = base:FindFirstChild("BotaoDono")
+	if botaoDono and botaoDono:IsA("BasePart") then
+		local scriptDono = nil
+		for _, filho in ipairs(botaoDono:GetChildren()) do
+			if filho:IsA("Script") and tipoDoScript(filho) == "BotaoDono" then scriptDono = filho end
+		end
+		if not scriptDono then
+			erro("BotaoDono sem o script BotaoDono")
+		elseif estaAtualizado("BotaoDono", scriptDono.Source) then
+			ok("BotaoDono com script")
+		else
+			aviso("BotaoDono com a versão antiga (não some ao pegar a base)")
+		end
+	else
+		erro("falta a peça BotaoDono solta dentro da base")
+	end
+	for _, obj in ipairs(base:GetDescendants()) do
+		if obj.Name == "BotaoDono" and obj:IsA("BasePart") and obj.Parent ~= base then
+			erro("BotaoDono dentro de outra pasta: " .. nomeCurto(obj) .. " (precisa ficar solto na base)")
+		end
+	end
+	for _, s in ipairs(lista("PlacaDono")) do
+		if estaAtualizado("PlacaDono", s.Source) then
+			ok("PlacaDono " .. nomeCurto(s.Parent))
+		else
+			aviso("PlacaDono " .. nomeCurto(s.Parent) .. ": versão antiga (sem as configurações de texto)")
+		end
+		if s.Parent.Parent ~= base then
+			aviso("PlacaDono dentro de outra pasta: " .. nomeCurto(s.Parent) .. " (só aparece depois de uma compra)")
+		end
+	end
+	if #lista("PlacaDono") == 0 then aviso("base sem PlacaDono") end
+	for _, obj in ipairs(base:GetDescendants()) do
+		if obj.Name == "Botao" and (obj:IsA("Folder") or obj:IsA("Model")) then
+			erro("pasta chamada \"Botao\": " .. nomeCurto(obj) .. " (só a peça pode se chamar Botao, renomeie a pasta)")
+		end
+		if obj:IsA("BasePart") then
+			local minusculo = obj.Name:lower()
+			if (minusculo == "botao" or minusculo == "botão") and obj.Name ~= "Botao" then
+				erro("peça com nome errado: " .. nomeCurto(obj) .. " (precisa ser exatamente Botao)")
+			end
+			if (minusculo == "botaocompra" or minusculo == "botãocompra") and obj.Name ~= "BotaoCompra" then
+				erro("peça com nome errado: " .. nomeCurto(obj) .. " (precisa ser exatamente BotaoCompra)")
+			end
+		end
+	end
+	linha("  Botões de compra (pasta | nome | preço | situação):")
+	local qtdBotoes = 0
+	for _, obj in ipairs(base:GetDescendants()) do
+		if obj:IsA("BasePart") and obj.Name == "Botao" then
+			qtdBotoes += 1
+			local pasta = obj.Parent
+			local onde = nomeCurto(pasta)
+			local scriptBotao = nil
+			for _, filho in ipairs(obj:GetChildren()) do
+				if filho:IsA("Script") and tipoDoScript(filho) == "Botao" then scriptBotao = filho end
+			end
+			if not scriptBotao then
+				erro(onde .. ": botão sem script de compra")
+			else
+				local src = scriptBotao.Source
+				local preco = src:match("\nlocal%s+preco%s*=%s*([^%s%-]+)") or "?"
+				local nome = src:match('\nlocal%s+nomeDoItem%s*=%s*"([^"]*)"') or "(sem nome)"
+				local situacao = "atualizado"
+				if not estaAtualizado("Botao", src) then
+					situacao = "DESATUALIZADO"
+				elseif not tem(src, "Touched:Connect(tentarComprar)") then
+					situacao = "INCOMPLETO (colado pela metade)"
+				end
+				if not scriptBotao.Enabled then situacao = situacao .. ", DESLIGADO" end
+				local texto = onde .. "  |  " .. nome .. "  |  " .. preco .. "  |  " .. situacao
+				if situacao == "atualizado" then ok(texto) else erro(texto) end
+				if preco == "0" then botoesGratis += 1 end
+				if nome == "Gerador" then botoesNomePadrao += 1 end
+			end
+			if pasta == base then
+				erro(onde .. ": Botao solto direto na base (precisa estar dentro de uma pasta de compra)")
+			end
+			local iguais = 0
+			for _, irmao in ipairs(pasta:GetChildren()) do
+				if irmao.Name == "Botao" then iguais += 1 end
+			end
+			if iguais > 1 then aviso(onde .. ": " .. iguais .. " objetos chamados Botao na mesma pasta") end
+			if not temPai(obj) then aviso(onde .. ": botão sem botão pai (aparece mesmo sem dono)") end
+		end
+	end
+	if qtdBotoes == 0 then aviso("nenhum botão de compra") end
+	linha("  Lojas de item (pasta | nome | preço | itens):")
+	local qtdLojas = 0
+	for _, obj in ipairs(base:GetDescendants()) do
+		if obj:IsA("BasePart") and obj.Name == "BotaoCompra" then
+			qtdLojas += 1
+			local pasta = obj.Parent
+			local onde = nomeCurto(pasta)
+			local scriptLoja = nil
+			for _, filho in ipairs(obj:GetChildren()) do
+				if filho:IsA("Script") and tipoDoScript(filho) == "BotaoCompra" then scriptLoja = filho end
+			end
+			local qtdTools = 0
+			for _, item in ipairs(pasta:GetDescendants()) do
+				if item:IsA("Tool") then qtdTools += 1 end
+			end
+			if pasta.Name ~= "BotaoCompra" then aviso(onde .. ": a pasta da loja precisa se chamar BotaoCompra") end
+			if pasta == base then erro(onde .. ": BotaoCompra solto direto na base (precisa estar dentro da pasta BotaoCompra)") end
+			if not scriptLoja then
+				erro(onde .. ": loja sem o script BotaoCompra")
+			else
+				local src = scriptLoja.Source
+				local preco = src:match("\nlocal%s+preco%s*=%s*([^%s%-]+)") or "?"
+				local nome = src:match('\nlocal%s+nomeDoItem%s*=%s*"([^"]*)"') or "(sem nome)"
+				local texto = onde .. "  |  " .. nome .. "  |  " .. preco .. "  |  " .. qtdTools .. " item(ns)"
+				if not scriptLoja.Enabled then
+					erro(texto .. "  |  script DESLIGADO")
+				elseif qtdTools == 0 then
+					aviso(texto .. "  |  nenhuma Tool na pasta")
+				else
+					ok(texto)
+				end
+			end
+			if not temPai(obj) then aviso(onde .. ": loja sem botão pai (aparece mesmo sem dono)") end
+		end
+	end
+	if qtdLojas == 0 then linha("    nenhuma") end
+	linha("  Máquinas:")
+	for _, s in ipairs(lista("Gerador")) do
+		local onde = nomeCurto(s.Parent)
+		local tipoBloco = s.Source:match('\nlocal%s+tipoDeBloco%s*=%s*"([^"]*)"')
+		if tipoBloco and blocos and blocos:FindFirstChild(tipoBloco) then
+			ok("Gerador " .. onde .. " solta " .. tipoBloco)
+		else
+			erro("Gerador " .. onde .. ": molde \"" .. tostring(tipoBloco) .. "\" não existe em ServerStorage.Blocos")
+		end
+		if not s.Enabled then aviso("Gerador " .. onde .. ": script desligado (Enabled desmarcado)") end
+	end
+	if #lista("Gerador") == 0 then aviso("base sem Gerador") end
+	local function conferir(tipo)
+		for _, s in ipairs(lista(tipo)) do
+			local onde = nomeCurto(s.Parent)
+			if estaAtualizado(tipo, s.Source) then
+				ok(tipo .. " " .. onde)
+			else
+				erro(tipo .. " " .. onde .. ": script DESATUALIZADO")
+			end
+			if s:IsA("Script") and not s.Enabled then
+				aviso(tipo .. " " .. onde .. ": script desligado (Enabled desmarcado)")
+			end
+		end
+	end
+	conferir("Esteira")
+	conferir("Upgrade")
+	conferir("DestinoFinal")
+	conferir("Coletor")
+	conferir("PainelArmazem")
+	if #lista("DestinoFinal") == 0 then aviso("base sem DestinoFinal") end
+	if #lista("Coletor") == 0 then erro("base sem Coletor") end
+	if #lista("PainelArmazem") == 0 then aviso("base sem PainelArmazem") end
+	for _, s in ipairs(lista("PortaLaser")) do
+		local pasta = s.Parent
+		local onde = nomeCurto(pasta)
+		if not estaAtualizado("PortaLaser", s.Source) then
+			aviso("PortaLaser " .. onde .. ": versão antiga (não liga e desliga partículas e luzes)")
+		end
+		if not (pasta:IsA("Folder") or pasta:IsA("Model")) then
+			erro("PortaLaser " .. onde .. ": o script precisa ficar direto na pasta PortaLaser")
+		else
+			local alavanca = pasta:FindFirstChild("Alavanca")
+			if not alavanca or not alavanca:IsA("BasePart") then
+				erro("PortaLaser " .. onde .. ": falta a peça Alavanca")
+			elseif not alavanca:FindFirstChildWhichIsA("ProximityPrompt") then
+				aviso("PortaLaser " .. onde .. ": Alavanca sem ProximityPrompt criado no Studio")
+			end
+			local qtdLasers = 0
+			for _, peca in ipairs(pasta:GetDescendants()) do
+				if peca:IsA("BasePart") and peca ~= alavanca and not (alavanca and peca:IsDescendantOf(alavanca)) then
+					qtdLasers += 1
+				end
+			end
+			if qtdLasers == 0 then
+				erro("PortaLaser " .. onde .. ": nenhum laser na pasta")
+			else
+				ok("PortaLaser " .. onde .. ": " .. qtdLasers .. " laser(s)")
+			end
+		end
+	end
+	for _, s in ipairs(lista("Outro")) do
+		aviso("script desconhecido: " .. nomeCurto(s) .. " (pode ser da Toolbox, confira se é seguro)")
+	end
+	for _, s in ipairs(lista("GeradorTeste")) do
+		erro("gerador de teste dentro da base: " .. nomeCurto(s))
+	end
+	linha("  Objetos por tipo:")
+	local classes = {}
+	for _, obj in ipairs(base:GetDescendants()) do
+		classes[obj.ClassName] = (classes[obj.ClassName] or 0) + 1
+	end
+	local nomes = {}
+	for nome in pairs(classes) do table.insert(nomes, nome) end
+	table.sort(nomes, function(a, b) return classes[a] > classes[b] end)
+	local grupo = {}
+	for i, nome in ipairs(nomes) do
+		table.insert(grupo, nome .. ": " .. classes[nome])
+		if #grupo == 4 or i == #nomes then
+			linha("    " .. table.concat(grupo, "  |  "))
+			grupo = {}
+		end
+	end
+	totais.botoes += qtdBotoes
+	totais.lojas += qtdLojas
+	totais.geradores += #lista("Gerador")
+	totais.esteiras += #lista("Esteira")
+	totais.upgrades += #lista("Upgrade")
+	totais.destinos += #lista("DestinoFinal")
+	totais.portas += #lista("PortaLaser")
+	totais.placas += #lista("PlacaDono")
+	totais.coletores += #lista("Coletor")
+	totais.paineis += #lista("PainelArmazem")
+	local temPlaca = "não"
+	if #lista("PlacaDono") > 0 then temPlaca = "sim" end
+	table.insert(resumoBases, string.format("  %s: %d botões, %d lojas, %d geradores, %d esteiras, %d upgrades, %d destinos, %d portas laser, placa do dono: %s", base.Name, qtdBotoes, qtdLojas, #lista("Gerador"), #lista("Esteira"), #lista("Upgrade"), #lista("DestinoFinal"), #lista("PortaLaser"), temPlaca))
+end
+if pastaTycoons and #bases == 0 then erro("nenhuma base (pasta) dentro de Tycoons") end
+titulo("FORA DAS BASES")
+local achouFora = false
+for _, info in ipairs(scripts) do
+	if info.obj:IsDescendantOf(workspace) and precisaBase[info.tipo] and not baseDe(info.obj) then
+		erro(info.tipo .. " fora de uma base: " .. info.obj:GetFullName())
+		achouFora = true
+	end
+end
+if not achouFora then ok("nenhum script de base solto fora das bases") end
+titulo("RESUMO")
+linha("  Bases: " .. #bases)
+linha("  Botões de compra: " .. totais.botoes .. "  |  Lojas de item: " .. totais.lojas)
+linha("  Geradores: " .. totais.geradores .. "  |  Esteiras: " .. totais.esteiras .. "  |  Upgrades: " .. totais.upgrades)
+linha("  Destinos finais: " .. totais.destinos .. "  |  Coletores: " .. totais.coletores .. "  |  Painéis: " .. totais.paineis)
+linha("  Portas laser: " .. totais.portas .. "  |  Placas do dono: " .. totais.placas)
+if blocos then linha("  Moldes de bloco: " .. #blocos:GetChildren()) end
+linha("")
+linha("  Por base:")
+for _, texto in ipairs(resumoBases) do linha(texto) end
+linha("")
+if botoesGratis > 0 then aviso(botoesGratis .. " botão(ões) com preço 0 (grátis). Era só para teste?") end
+if botoesNomePadrao > 0 then aviso(botoesNomePadrao .. " botão(ões) com o nome padrão \"Gerador\". Confira os nomes.") end
+if erros == 0 and avisos == 0 then linha("  TUDO CERTO! O projeto está funcionando como deveria.") end
+linha(string.format("  TOTAL: %d erro(s) e %d aviso(s)", erros, avisos))
+local textos = {}
+for _, item in ipairs(linhas) do
+	if item[1] == "info" then print(item[2]) else warn(item[2]) end
+	table.insert(textos, item[2])
+end
+local relatorio = ServerStorage:FindFirstChild("RelatorioProjeto")
+if relatorio then relatorio:Destroy() end
+relatorio = Instance.new("Script")
+relatorio.Name = "RelatorioProjeto"
+relatorio.Enabled = false
+relatorio.Source = "--[==[\n" .. table.concat(textos, "\n") .. "\n]==]"
+relatorio.Parent = ServerStorage
