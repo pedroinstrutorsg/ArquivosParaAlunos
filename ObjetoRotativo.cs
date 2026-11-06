@@ -45,7 +45,7 @@ public class ObjetoRotativo : MonoBehaviour
     // Velocidade de um ponto em cima do objeto (o Player usa para girar junto)
     public Vector3 VelocidadeNoPonto(Vector3 ponto)
     {
-        if (rb == null) return Vector3.zero;
+        if (rb == null || !enabled) return Vector3.zero; // parado ou desligado
 
         Vector3 distancia = ponto - rb.position;          // do centro até o ponto
         Vector3 novaDistancia = GiroDoPasso() * distancia; // onde o ponto vai estar depois do giro

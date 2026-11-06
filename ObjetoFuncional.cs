@@ -12,8 +12,8 @@ public class ObjetoFuncional : MonoBehaviour
     private int sentido = 1; // Variável que determina se a plataforma segue a direção determinada ou o seu oposto
     private Rigidbody rb; // física da plataforma
 
-    // Velocidade da plataforma agora (o Player usa para andar junto)
-    public Vector3 Velocidade => eixoMovimento.normalized * sentido * velocidade;
+    // Velocidade da plataforma agora (o Player usa para andar junto). Zero se o script estiver desligado
+    public Vector3 Velocidade => enabled ? eixoMovimento.normalized * sentido * velocidade : Vector3.zero;
 
     void Start()
     {

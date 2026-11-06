@@ -139,6 +139,8 @@ public class Player : MonoBehaviour
     private GameObject plataformaEmbaixo;                 // plataforma que anda ou gira, embaixo do player
     private Vector3 velocidadePlataforma = Vector3.zero;  // velocidade dessa plataforma neste passo
 
+    private Vector3 ventoAcumulado = Vector3.zero; // vento recebido desde o último passo
+
     private float rotacaoHorizontal = 0f; // giro do player para os lados, aplicado na física
 
     // Converte o movimento do mouse em graus (sensibilidadeMouse 200 vira cerca de 4 graus por unidade)
@@ -340,8 +342,12 @@ public class Player : MonoBehaviour
     {
         velocidadePlataforma = CalcularVelocidadePlataforma();
 
-        // Parte da velocidade da plataforma no chão (X e Z)
-        Vector3 plataformaNoChao = new Vector3(velocidadePlataforma.x, 0f, velocidadePlataforma.z);
+        // O que arrasta o player nos lados (X e Z): a plataforma embaixo dele e o vento
+        Vector3 arrasto = new Vector3(velocidadePlataforma.x, 0f, velocidadePlataforma.z);
+
+        // Soma o vento recebido neste passo e zera para o próximo
+        arrasto += ventoAcumulado;
+        ventoAcumulado = Vector3.zero;
 
         Vector3 direcao = Vector3.zero; // direção apertada nas teclas
 
@@ -361,8 +367,8 @@ public class Player : MonoBehaviour
         // Velocidade que o player quer ter (normalized: a diagonal não fica mais rápida)
         Vector3 alvo = direcao.normalized * velocidadeAtual;
 
-        // Velocidade que o player tem agora em relação à plataforma, sem a queda (Y)
-        Vector3 atual = new Vector3(rb.velocity.x, 0f, rb.velocity.z) - plataformaNoChao;
+        // Velocidade que o player tem agora sem o arrasto e sem a queda (Y)
+        Vector3 atual = new Vector3(rb.velocity.x, 0f, rb.velocity.z) - arrasto;
 
         float aceleracao; // quanto a velocidade pode mudar por segundo
 
@@ -389,8 +395,8 @@ public class Player : MonoBehaviour
         // Chega um pouco mais perto da velocidade alvo
         Vector3 novaVelocidade = Vector3.MoveTowards(atual, alvo, aceleracao * Time.fixedDeltaTime);
 
-        // Soma a velocidade da plataforma: o player anda junto com ela
-        novaVelocidade += plataformaNoChao;
+        // Soma o arrasto de volta: o player anda junto com a plataforma e com o vento
+        novaVelocidade += arrasto;
 
         // Mantém a velocidade de queda/pulo
         novaVelocidade.y = rb.velocity.y;
@@ -401,6 +407,12 @@ public class Player : MonoBehaviour
             novaVelocidade.y = Mathf.Min(novaVelocidade.y, velocidadePlataforma.y);
 
         rb.velocity = novaVelocidade;
+    }
+
+    // Recebe o vento dos lados (usado pelo Vento)
+    public void AdicionarVento(Vector3 velocidade)
+    {
+        ventoAcumulado += new Vector3(velocidade.x, 0f, velocidade.z);
     }
 
     // Velocidade da plataforma embaixo do player (zero se não tiver)
