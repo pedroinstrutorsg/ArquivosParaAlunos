@@ -1,22 +1,22 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 #if UNITY_EDITOR
-using UnityEditor; // NecessÃ¡rio para reconhecer o tipo SceneAsset (sÃ³ existe dentro do editor)
+using UnityEditor; // Necessário para reconhecer o tipo SceneAsset (só existe dentro do editor)
 #endif
 
 public class TrocaCena : MonoBehaviour
 {
     // CENA DE DESTINO
 
-    // Campo onde vocÃª arrasta a cena da pasta Assets.
-    // Ã‰ do tipo Object porque o tipo "cena" (SceneAsset) sÃ³ existe dentro do editor.
-    // No jogo final (build) a Unity nÃ£o conhece esse tipo, entÃ£o guardamos tambÃ©m o nome da cena.
+    // Campo onde você arrasta a cena da pasta Assets.
+    // É do tipo Object porque o tipo "cena" (SceneAsset) só existe dentro do editor.
+    // No jogo final (build) a Unity não conhece esse tipo, então guardamos também o nome da cena.
     [Header("Cena de Destino")]
-    [Tooltip("Arraste aqui a cena para onde o player serÃ¡ enviado (pela pasta Assets)")]
+    [Tooltip("Arraste aqui a cena para onde o player será enviado (pela pasta Assets)")]
     public Object cena;
 
-    // Nome da cena, preenchido automaticamente quando vocÃª arrasta a cena no campo acima.
-    // Fica escondido no Inspetor porque vocÃª nÃ£o precisa mexer nele.
+    // Nome da cena, preenchido automaticamente quando você arrasta a cena no campo acima.
+    // Fica escondido no Inspetor porque você não precisa mexer nele.
     [SerializeField, HideInInspector]
     private string nomeCena;
 
@@ -37,14 +37,14 @@ public class TrocaCena : MonoBehaviour
             return;
         }
 
-        // Garante que o que foi arrastado Ã© realmente uma cena
+        // Garante que o que foi arrastado é realmente uma cena
         if (cena is SceneAsset)
         {
             nomeCena = cena.name; // Guarda o nome da cena para usar no jogo
         }
         else
         {
-            Debug.LogWarning("O objeto arrastado em TrocaCena nÃ£o Ã© uma cena.", this);
+            Debug.LogWarning("O objeto arrastado em TrocaCena não é uma cena.", this);
             cena = null;
             nomeCena = "";
         }
@@ -54,24 +54,24 @@ public class TrocaCena : MonoBehaviour
     // Chamado quando outro collider entra no gatilho (o Collider precisa estar com Is Trigger marcado)
     void OnTriggerEnter(Collider other)
     {
-        // SÃ³ reage ao Player
+        // Só reage ao Player
         if (!other.CompareTag("Player")) return;
 
-        // Se nenhuma cena foi arrastada, avisa no Console e nÃ£o faz nada
+        // Se nenhuma cena foi arrastada, avisa no Console e não faz nada
         if (string.IsNullOrEmpty(nomeCena))
         {
             Debug.LogWarning("TrocaCena sem cena de destino configurada.", this);
             return;
         }
 
-        // Se a cena nÃ£o estiver no Build Settings, a Unity nÃ£o consegue carregar
+        // Se a cena não estiver no Build Settings, a Unity não consegue carregar
         if (!Application.CanStreamedLevelBeLoaded(nomeCena))
         {
-            Debug.LogError("A cena \"" + nomeCena + "\" nÃ£o estÃ¡ no Build Settings. Adicione ela em File > Build Settings.", this);
+            Debug.LogError("A cena \"" + nomeCena + "\" não está no Build Settings. Adicione ela em File > Build Settings.", this);
             return;
         }
 
-        // Apaga o checkpoint da fase atual, para o player nÃ£o nascer na posiÃ§Ã£o de um checkpoint da cena antiga
+        // Apaga o checkpoint da fase atual, para o player não nascer na posição de um checkpoint da cena antiga
         if (resetarCheckpoint)
         {
             CheckpointManager.Resetar();

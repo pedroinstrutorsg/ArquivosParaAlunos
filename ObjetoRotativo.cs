@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody))] // O objeto precisa de um Rigidbody para girar pela física
 public class ObjetoRotativo : MonoBehaviour
 {
     [Tooltip("Eixo em que o objeto vai rotacionar (ex: Vector3.up para girar no eixo Y)")]
@@ -15,33 +16,40 @@ public class ObjetoRotativo : MonoBehaviour
     public bool espacoLocal = false; // Variável que define o Space usado no transform.Rotate
 
     private int sentido = 1; // Variável interna que aplica o sentido escolhido no inspetor
-    private bool playerNoObjeto = false; // Variável que verifica se o player está encostando no objeto
-    private Transform playerTransform; // Guarda a referência do player enquanto ele estiver em contato
+    private Rigidbody rb;    // física do objeto
 
     void Start() // Função chamada uma vez no início
     {
         sentido = sentidoInvertido ? -1 : 1; // Define o sentido com base no bool marcado no inspetor
+
+        rb = GetComponent<Rigidbody>();
+        rb.isKinematic = true;  // só o script gira o objeto
+        rb.useGravity = false;  // o objeto não cai
+        rb.interpolation = RigidbodyInterpolation.Interpolate; // giro suave na tela
     }
 
-    void Update() // Função chamada o tempo todo
+    // Gira o objeto junto com a física
+    void FixedUpdate()
     {
-        Space espaco = espacoLocal ? Space.Self : Space.World; // Escolhe o Space com base na variável pública
-        float anguloDelta = sentido * velocidadeRotacao * Time.deltaTime; // Quanto o objeto vai girar nesse frame
+        rb.MoveRotation(GiroDoPasso() * rb.rotation);
+    }
 
-        transform.Rotate(eixoRotacao.normalized * anguloDelta, espaco); // Código que rotaciona o objeto
+    // Quanto o objeto gira em um passo de física
+    Quaternion GiroDoPasso()
+    {
+        Vector3 eixoMundo = espacoLocal ? rb.rotation * eixoRotacao.normalized : eixoRotacao.normalized;
+        float angulo = sentido * velocidadeRotacao * Time.fixedDeltaTime;
+        return Quaternion.AngleAxis(angulo, eixoMundo);
+    }
 
-        if (playerNoObjeto && playerTransform != null) // Se o player estiver em contato, orbita só a posição dele, sem mexer na rotação
-        {
-            // Se o eixo for local, converte para o eixo correspondente no mundo antes de calcular a órbita
-            Vector3 eixoMundo = espacoLocal ? transform.TransformDirection(eixoRotacao.normalized) : eixoRotacao.normalized;
+    // Velocidade de um ponto em cima do objeto (o Player usa para girar junto)
+    public Vector3 VelocidadeNoPonto(Vector3 ponto)
+    {
+        if (rb == null) return Vector3.zero;
 
-            Vector3 direcaoAtePlayer = playerTransform.position - transform.position; // Vetor do centro do objeto até o player
-            Quaternion rotacaoDelta = Quaternion.AngleAxis(anguloDelta, eixoMundo); // Rotação equivalente ao ângulo girado nesse frame
-            playerTransform.position = transform.position + rotacaoDelta * direcaoAtePlayer; // Recalcula só a POSIÇÃO orbitando o player, sem tocar na rotação dele
-
-            // Note: a rotação do playerTransform (playerTransform.rotation) nunca é alterada aqui,
-            // então o Player sempre continua na rotação em que ele mesmo se colocou (sempre em pé)
-        }
+        Vector3 distancia = ponto - rb.position;          // do centro até o ponto
+        Vector3 novaDistancia = GiroDoPasso() * distancia; // onde o ponto vai estar depois do giro
+        return (novaDistancia - distancia) / Time.fixedDeltaTime;
     }
 
     void OnTriggerEnter(Collider other) // Função (OnTriggerEnter) só acionada quando um objeto colide no outro
@@ -49,27 +57,6 @@ public class ObjetoRotativo : MonoBehaviour
         if (other.CompareTag("Limite")) // Verifica se a tag do objeto é exatamente "Limite"
         {
             sentido *= -1; // Ao encostar no "Limite" o sentido da rotação é invertido
-        }
-    }
-
-    void OnCollisionStay(Collision collision) // Função chamada enquanto o objeto continua encostando em outro
-    {
-        if (collision.gameObject.CompareTag("Player")) // Quando o objeto toca algo, verifica se a tag é exatamente "Player"
-        {
-            if (!playerNoObjeto) // Verifica se a variável playerNoObjeto é falsa, caso seja ele executa o código abaixo
-            {
-                playerNoObjeto = true; // transforma a variável em verdadeira
-                playerTransform = collision.transform; // Guarda a referência do player para girá-lo junto no Update, sem usar SetParent
-            }
-        }
-    }
-
-    void OnCollisionExit(Collision collision) // Função (OnCollisionExit) é chamada quando um objeto deixa de encostar no objeto
-    {
-        if (collision.gameObject.CompareTag("Player"))
-        {
-            playerNoObjeto = false;
-            playerTransform = null; // Remove a referência, o player deixa de girar junto
         }
     }
 }

@@ -1,29 +1,29 @@
 using UnityEngine;
 
-// Faz o objeto crescer para as direÃ§Ãµes escolhidas, mantendo o lado oposto parado.
-// Ex.: se crescer sÃ³ para "Cima", a base do objeto fica no mesmo lugar.
+// Faz o objeto crescer para as direções escolhidas, mantendo o lado oposto parado.
+// Ex.: se crescer só para "Cima", a base do objeto fica no mesmo lugar.
 public class CrescimentoDirecional : MonoBehaviour
 {
     [System.Serializable]
     public class Direcao
     {
-        [Tooltip("Marque para o objeto crescer nesta direÃ§Ã£o")]
+        [Tooltip("Marque para o objeto crescer nesta direção")]
         public bool ativa = false;
 
-        [Tooltip("Quanto o objeto vai crescer nesta direÃ§Ã£o (em metros / unidades da Unity)")]
+        [Tooltip("Quanto o objeto vai crescer nesta direção (em metros / unidades da Unity)")]
         public float quantidade = 2f;
 
         [Tooltip("Velocidade do crescimento (metros por segundo)")]
         public float velocidade = 1f;
 
-        [Tooltip("Se marcado, ao chegar no tamanho mÃ¡ximo ele volta ao formato original e depois cresce de novo, repetindo sempre")]
+        [Tooltip("Se marcado, ao chegar no tamanho máximo ele volta ao formato original e depois cresce de novo, repetindo sempre")]
         public bool vaiEVolta = false;
 
         [HideInInspector] public float crescimentoAtual = 0f;
         [HideInInspector] public bool voltando = false;
     }
 
-    [Header("DireÃ§Ãµes de crescimento")]
+    [Header("Direções de crescimento")]
     public Direcao cima = new Direcao();      // +Y
     public Direcao baixo = new Direcao();     // -Y
     public Direcao direita = new Direcao();   // +X
@@ -32,11 +32,11 @@ public class CrescimentoDirecional : MonoBehaviour
     public Direcao tras = new Direcao();      // -Z
 
     [Header("Controle")]
-    [Tooltip("Se marcado, comeÃ§a a crescer assim que o jogo inicia (depois do tempo de espera)")]
+    [Tooltip("Se marcado, começa a crescer assim que o jogo inicia (depois do tempo de espera)")]
     public bool crescerAoIniciar = true;
 
-    [Tooltip("Quantos segundos esperar antes de comeÃ§ar a crescer")]
-    public float tempoParaComecar = 0f;
+    [Tooltip("Quantos segundos esperar antes de começar a crescer")]
+    public float tempoParaComecar = 0f;     
 
     private bool crescendo = false;
     private float timer = 0f;
@@ -49,7 +49,7 @@ public class CrescimentoDirecional : MonoBehaviour
         escalaInicial = transform.localScale;
         posicaoInicial = transform.localPosition;
 
-        // Descobre o tamanho real da malha (um Cube padrÃ£o tem tamanho 1)
+        // Descobre o tamanho real da malha (um Cube padrão tem tamanho 1)
         MeshFilter mf = GetComponent<MeshFilter>();
         if (mf != null && mf.sharedMesh != null)
         {
@@ -67,7 +67,7 @@ public class CrescimentoDirecional : MonoBehaviour
     {
         if (!crescendo) return;
 
-        // Espera o timer antes de comeÃ§ar
+        // Espera o timer antes de começar
         if (timer > 0f)
         {
             timer -= Time.deltaTime;
@@ -84,21 +84,21 @@ public class CrescimentoDirecional : MonoBehaviour
         AplicarTamanho();
     }
 
-    // Faz o crescimento de uma direÃ§Ã£o andar atÃ© o alvo
+    // Faz o crescimento de uma direção andar até o alvo
     void Avancar(Direcao d)
     {
         float alvo;
 
         if (!d.ativa)
         {
-            alvo = 0f; // direÃ§Ã£o desligada volta ao original
+            alvo = 0f; // direção desligada volta ao original
         }
         else if (d.vaiEVolta)
         {
-            // Chegou no mÃ¡ximo: comeÃ§a a voltar
+            // Chegou no máximo: começa a voltar
             if (!d.voltando && d.crescimentoAtual >= d.quantidade)
                 d.voltando = true;
-            // Chegou no original: comeÃ§a a crescer de novo
+            // Chegou no original: começa a crescer de novo
             else if (d.voltando && d.crescimentoAtual <= 0f)
                 d.voltando = false;
 
@@ -135,13 +135,13 @@ public class CrescimentoDirecional : MonoBehaviour
             (frente.crescimentoAtual - tras.crescimentoAtual) / 2f
         );
 
-        // Usa a rotaÃ§Ã£o do objeto, entÃ£o "cima" Ã© o cima do prÃ³prio objeto
+        // Usa a rotação do objeto, então "cima" é o cima do próprio objeto
         transform.localPosition = posicaoInicial + transform.localRotation * deslocamento;
     }
 
-    // ---------- FunÃ§Ãµes que podem ser chamadas por outros scripts ou botÃµes ----------
+    // ---------- Funções que podem ser chamadas por outros scripts ou botões ----------
 
-    // ComeÃ§a a crescer (respeitando o tempo de espera)
+    // Começa a crescer (respeitando o tempo de espera)
     public void Crescer()
     {
         timer = tempoParaComecar;
@@ -161,7 +161,7 @@ public class CrescimentoDirecional : MonoBehaviour
         crescendo = true;
     }
 
-    // Volta o objeto ao tamanho e posiÃ§Ã£o originais
+    // Volta o objeto ao tamanho e posição originais
     public void Resetar()
     {
         Direcao[] todas = { cima, baixo, direita, esquerda, frente, tras };

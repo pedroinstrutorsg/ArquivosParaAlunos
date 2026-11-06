@@ -1,33 +1,33 @@
 using UnityEngine;
 
-// Efeitos da c√¢mera do player: balan√ßo dos passos, FOV na corrida e tremor leve.
-// S√≥ mexe na posi√ß√£o local, no FOV e soma um tremor pequeno. N√£o l√™ o mouse.
+// Efeitos da c‚mera do player: balanÁo dos passos, FOV na corrida e tremor leve.
+// SÛ mexe na posiÁ„o local, no FOV e soma um tremor pequeno. N„o lÍ o mouse.
 [DefaultExecutionOrder(100)]
 [RequireComponent(typeof(Camera))]
 public class CameraCorrida : MonoBehaviour
 {
-    [Tooltip("O Player. Se ficar vazio, procura sozinho nos pais da c√¢mera")]
+    [Tooltip("O Player. Se ficar vazio, procura sozinho nos pais da c‚mera")]
     public Player player;
 
-    [Header("Balan√ßo dos Passos")]
+    [Header("BalanÁo dos Passos")]
     public bool ativarBalanco = true;
 
-    [Tooltip("Quanto a c√¢mera sobe e desce a cada passo")]
+    [Tooltip("Quanto a c‚mera sobe e desce a cada passo")]
     public float alturaBalanco = 0.05f;
 
-    [Tooltip("Quanto a c√¢mera vai para os lados a cada passo. 0 = sem balan√ßo lateral")]
+    [Tooltip("Quanto a c‚mera vai para os lados a cada passo. 0 = sem balanÁo lateral")]
     public float larguraBalanco = 0.02f;
 
-    [Tooltip("Passos por segundo andando. Correndo fica mais r√°pido sozinho")]
+    [Tooltip("Passos por segundo andando. Correndo fica mais r·pido sozinho")]
     public float passosPorSegundo = 1.8f;
 
-    [Header("Campo de Vis√£o (FOV)")]
+    [Header("Campo de Vis„o (FOV)")]
     public bool ativarFov = true;
 
     [Tooltip("Quantos graus o FOV abre na velocidade de corrida")]
     public float aumentoFovCorrendo = 10f;
 
-    [Tooltip("Qu√£o r√°pido o FOV muda. Maior = mais r√°pido")]
+    [Tooltip("Qu„o r·pido o FOV muda. Maior = mais r·pido")]
     public float suavidadeFov = 5f;
 
     [Header("Tremor na Corrida")]
@@ -36,14 +36,14 @@ public class CameraCorrida : MonoBehaviour
     [Tooltip("Tamanho do tremor em graus. 0.3 = leve, 1 = forte")]
     public float intensidadeTremor = 0.3f;
 
-    [Tooltip("Rapidez do tremor. Maior = vibra mais r√°pido")]
+    [Tooltip("Rapidez do tremor. Maior = vibra mais r·pido")]
     public float velocidadeTremor = 12f;
 
     private Camera cam;
-    private Vector3 posicaoBase;     // posi√ß√£o original da c√¢mera (na cabe√ßa do player)
-    private float fovBase;           // FOV original da c√¢mera
-    private float tempoBalanco = 0f; // rel√≥gio dos passos
-    private Vector3 balancoAtual;    // deslocamento atual do balan√ßo
+    private Vector3 posicaoBase;     // posiÁ„o original da c‚mera (na cabeÁa do player)
+    private float fovBase;           // FOV original da c‚mera
+    private float tempoBalanco = 0f; // relÛgio dos passos
+    private Vector3 balancoAtual;    // deslocamento atual do balanÁo
     private float forcaTremor = 0f;  // 0 = sem tremor, 1 = tremor cheio
 
     void Start()
@@ -56,7 +56,7 @@ public class CameraCorrida : MonoBehaviour
             player = GetComponentInParent<Player>();
 
         if (player == null)
-            Debug.LogWarning("CameraCorrida: n√£o achei o Player. Arraste ele no Inspector.");
+            Debug.LogWarning("CameraCorrida: n„o achei o Player. Arraste ele no Inspector.");
     }
 
     // Devolve o FOV original se o script for desligado
@@ -66,7 +66,7 @@ public class CameraCorrida : MonoBehaviour
             cam.fieldOfView = fovBase;
     }
 
-    // Roda depois do Update do Player, ent√£o a rota√ß√£o do mouse j√° foi aplicada
+    // Roda depois do Update do Player, ent„o a rotaÁ„o do mouse j· foi aplicada
     void LateUpdate()
     {
         if (player == null) return;
@@ -82,13 +82,13 @@ public class CameraCorrida : MonoBehaviour
         AtualizarTremor(nivelCorrida, andandoNoChao);
     }
 
-    // Suaviza√ß√£o que n√£o depende do FPS (valor maior = chega mais r√°pido)
+    // SuavizaÁ„o que n„o depende do FPS (valor maior = chega mais r·pido)
     static float Suavizar(float velocidade)
     {
         return 1f - Mathf.Exp(-velocidade * Time.deltaTime);
     }
 
-    // Balan√ßo: a c√¢mera faz um "8" deitado a cada par de passos
+    // BalanÁo: a c‚mera faz um "8" deitado a cada par de passos
     void AtualizarBalanco(float velocidade, bool andandoNoChao)
     {
         Vector3 alvo = Vector3.zero; // parado ou no ar: volta ao centro
@@ -106,7 +106,7 @@ public class CameraCorrida : MonoBehaviour
         transform.localPosition = posicaoBase + balancoAtual;
     }
 
-    // FOV: abre conforme a velocidade sobe at√© a corrida
+    // FOV: abre conforme a velocidade sobe atÈ a corrida
     void AtualizarFov(float nivelCorrida)
     {
         if (!ativarFov) return;
@@ -120,7 +120,7 @@ public class CameraCorrida : MonoBehaviour
     {
         if (!ativarTremor) return;
 
-        // O Player redefine a rota√ß√£o da c√¢mera todo frame; sem isso o tremor se acumularia
+        // O Player redefine a rotaÁ„o da c‚mera todo frame; sem isso o tremor se acumularia
         if (player.cameraPersonagem != transform) return;
 
         float alvo = (andandoNoChao && player.EstadoAtual == EstadoMovimento.Correndo) ? nivelCorrida : 0f;

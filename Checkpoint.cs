@@ -2,17 +2,17 @@ using UnityEngine;
 
 public class Checkpoint : MonoBehaviour
 {
-    [Tooltip("Ordem deste checkpoint na fase (0, 1, 2...) ‚Äî evita retroceder o progresso")]
+    [Tooltip("Ordem deste checkpoint na fase (0, 1, 2...) ó evita retroceder o progresso")]
     public int indice;
 
-    // Uso OnTriggerEnter (n√£o OnCollisionEnter) porque o checkpoint n√£o deve
-    // ter colis√£o f√≠sica, s√≥ detectar a passagem do player.
+    // Uso OnTriggerEnter (n„o OnCollisionEnter) porque o checkpoint n„o deve
+    // ter colis„o fÌsica, sÛ detectar a passagem do player.
     // IMPORTANTE: o Collider deste GameObject precisa estar marcado como "Is Trigger" no Inspector.
     private void OnTriggerEnter(Collider other)
     {
         if (!other.CompareTag("Player")) return;
 
-        // S√≥ atualiza se for um checkpoint mais avan√ßado que o atual
+        // SÛ atualiza se for um checkpoint mais avanÁado que o atual
         if (indice <= CheckpointManager.indiceCheckpoint) return;
 
         CheckpointManager.indiceCheckpoint = indice;

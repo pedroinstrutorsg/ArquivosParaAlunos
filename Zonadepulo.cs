@@ -14,24 +14,24 @@ public class Ajuste<T>
 }
 
 // Coloque este script em uma parede/objeto com Collider marcado como "Is Trigger".
-// Quando o Player encosta, ele recebe os valores de todas as vari√°veis marcadas em "Alterar".
+// Quando o Player encosta, ele recebe os valores de todas as vari·veis marcadas em "Alterar".
 public class ZonaDePulo : MonoBehaviour
 {
     [Header("Zona")]
-    [Tooltip("Tempo (em segundos) que o player precisa esperar antes de outra zona poder alter√°-lo de novo")]
+    [Tooltip("Tempo (em segundos) que o player precisa esperar antes de outra zona poder alter·-lo de novo")]
     public float cooldown = 2f;
 
     [Tooltip("Mostra no Console o que foi alterado")]
     public bool mostrarNoConsole = true;
 
-    // Os valores iniciais abaixo s√£o os mesmos padr√µes do Player
+    // Os valores iniciais abaixo s„o os mesmos padrıes do Player
     [Header("Andar / Correr")]
     public Ajuste<float> velocidadeAndar = new Ajuste<float>(5f);
     public Ajuste<float> velocidadeCorrer = new Ajuste<float>(9f);
     public Ajuste<float> tempoParaCorrer = new Ajuste<float>(1.5f);
     public Ajuste<bool> aumentoGradual = new Ajuste<bool>(true);
 
-    [Header("Acelera√ß√£o e Frenagem")]
+    [Header("AceleraÁ„o e Frenagem")]
     public Ajuste<float> tempoAcelerar = new Ajuste<float>(0.1f);
     public Ajuste<float> tempoFrear = new Ajuste<float>(0.1f);
     [Tooltip("De 0 a 1")]
@@ -39,17 +39,17 @@ public class ZonaDePulo : MonoBehaviour
 
     [Header("Pulo")]
     public Ajuste<float> forcaPulo = new Ajuste<float>(6f);
-    [Tooltip("0 = n√£o pula, 1 = pulo normal, 2 = pulo duplo")]
+    [Tooltip("0 = n„o pula, 1 = pulo normal, 2 = pulo duplo")]
     public Ajuste<int> pulosMaximos = new Ajuste<int>(1);
     public Ajuste<float> tempoCoyote = new Ajuste<float>(0.15f);
-    [Tooltip("Tempo m√≠nimo (em segundos) entre um pulo e outro")]
+    [Tooltip("Tempo mÌnimo (em segundos) entre um pulo e outro")]
     public Ajuste<float> cooldownEntrePulos = new Ajuste<float>(0.2f);
 
-    // Chamado uma vez quando a fase come√ßa
+    // Chamado uma vez quando a fase comeÁa
     void Start()
     {
-        // Se a zona tiver a tag "Limite", ela fica invis√≠vel durante o jogo.
-        // S√≥ o desenho some: o collider continua funcionando normalmente.
+        // Se a zona tiver a tag "Limite", ela fica invisÌvel durante o jogo.
+        // SÛ o desenho some: o collider continua funcionando normalmente.
         if (CompareTag("Limite"))
         {
             Renderer desenho = GetComponent<Renderer>();
@@ -65,7 +65,7 @@ public class ZonaDePulo : MonoBehaviour
         Player player = outro.GetComponentInParent<Player>();
         if (player == null) return;
 
-        // Se outra zona alterou o player h√° pouco tempo, n√£o faz nada
+        // Se outra zona alterou o player h· pouco tempo, n„o faz nada
         if (player.EmCooldownDeTroca) return;
 
         // ===== Andar / Correr =====
@@ -74,20 +74,20 @@ public class ZonaDePulo : MonoBehaviour
         Aplicar(tempoParaCorrer, ref player.tempoParaCorrer, "Tempo Para Correr");
         Aplicar(aumentoGradual, ref player.aumentoGradual, "Aumento Gradual");
 
-        // ===== Acelera√ß√£o e Frenagem =====
+        // ===== AceleraÁ„o e Frenagem =====
         Aplicar(tempoAcelerar, ref player.tempoAcelerar, "Tempo Acelerar");
         Aplicar(tempoFrear, ref player.tempoFrear, "Tempo Frear");
         Aplicar(controleNoAr, ref player.controleNoAr, "Controle No Ar");
         player.controleNoAr = Mathf.Clamp01(player.controleNoAr); // garante que fica entre 0 e 1
 
         // ===== Pulo =====
-        Aplicar(forcaPulo, ref player.forcaPulo, "For√ßa Pulo");
+        Aplicar(forcaPulo, ref player.forcaPulo, "ForÁa Pulo");
         Aplicar(tempoCoyote, ref player.tempoCoyote, "Tempo Coyote");
         Aplicar(cooldownEntrePulos, ref player.cooldownEntrePulos, "Cooldown Entre Pulos");
-        player.cooldownEntrePulos = Mathf.Max(0f, player.cooldownEntrePulos); // n√£o deixa ficar negativo
+        player.cooldownEntrePulos = Mathf.Max(0f, player.cooldownEntrePulos); // n„o deixa ficar negativo
 
-        // Os pulos usam a fun√ß√£o do Player, porque al√©m de trocar o n√∫mero
-        // ela tamb√©m recarrega os pulos na hora
+        // Os pulos usam a funÁ„o do Player, porque alÈm de trocar o n˙mero
+        // ela tambÈm recarrega os pulos na hora
         if (pulosMaximos.alterar)
         {
             player.DefinirPulos(pulosMaximos.valor, cooldown);
@@ -95,12 +95,12 @@ public class ZonaDePulo : MonoBehaviour
                 Debug.Log("Player agora tem " + player.pulosMaximos + " pulo(s)");
         }
 
-        // Come√ßa o cooldown: nenhuma zona altera o player at√© ele acabar
+        // ComeÁa o cooldown: nenhuma zona altera o player atÈ ele acabar
         player.IniciarCooldownDeTroca(cooldown);
     }
 
-    // Se o ajuste estiver marcado, copia o valor para a vari√°vel do player.
-    // "ref" quer dizer que a fun√ß√£o mexe direto na vari√°vel do player, e n√£o numa c√≥pia dela.
+    // Se o ajuste estiver marcado, copia o valor para a vari·vel do player.
+    // "ref" quer dizer que a funÁ„o mexe direto na vari·vel do player, e n„o numa cÛpia dela.
     void Aplicar<T>(Ajuste<T> ajuste, ref T variavelDoPlayer, string nome)
     {
         if (!ajuste.alterar) return;
@@ -108,6 +108,6 @@ public class ZonaDePulo : MonoBehaviour
         variavelDoPlayer = ajuste.valor;
 
         if (mostrarNoConsole)
-            Debug.Log(nome + " agora √© " + ajuste.valor);
+            Debug.Log(nome + " agora È " + ajuste.valor);
     }
 }
