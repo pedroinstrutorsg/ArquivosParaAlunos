@@ -34,6 +34,9 @@ local liberado = true     -- se este botão pode ser comprado agora
 local originalItens = {}  -- como cada item da pasta era no Studio
 local originalBotao = {}  -- como o botão era no Studio
 
+-- nomes das peças que funcionam como botão
+local nomesDeBotao = { "Botao", "BotaoCompra" }
+
 -- tipos de objeto que ligam e desligam
 local tiposComEnabled = {
 	"Script", "ParticleEmitter", "Light", "Fire", "Smoke", "Sparkles",
@@ -99,20 +102,22 @@ end
 local function ehDeOutroBotao(objeto)
 	local atual = objeto.Parent
 	while atual and atual ~= pasta do
-		local outro = atual:FindFirstChild("Botao")
-		if outro and outro ~= botao and outro:IsA("BasePart") then
-			return true
+		for _, nome in ipairs(nomesDeBotao) do
+			local outro = atual:FindFirstChild(nome)
+			if outro and outro ~= botao and outro:IsA("BasePart") then
+				return true
+			end
 		end
 		atual = atual.Parent
 	end
 	return false
 end
 
--- devolve o botão pai (outro Botao acima, ou o BotaoDono da base)
+-- devolve o botão pai (um botão acima, ou o BotaoDono da base)
 local function acharBotaoPai()
 	local atual = pasta.Parent
 	while atual and atual ~= game do
-		local outro = atual:FindFirstChild("Botao") or atual:FindFirstChild("BotaoDono")
+		local outro = atual:FindFirstChild("Botao") or atual:FindFirstChild("BotaoCompra") or atual:FindFirstChild("BotaoDono")
 		if outro and outro:IsA("BasePart") then
 			return outro
 		end
@@ -196,6 +201,34 @@ local function resetar()
 	botao:SetAttribute("Comprado", nil)
 end
 
+-- compra quando o dono toca no botão
+local function tentarComprar(hit)
+	if jaComprado or not liberado then return end
+
+	local jogador = Players:GetPlayerFromCharacter(hit.Parent)
+	if not jogador then return end
+
+	-- só o dono da base compra
+	if not Economia.ehDono(tycoon, jogador) then return end
+
+	local carteira = Economia.carteiras[jogador.UserId] or 0
+
+	if carteira >= preco then
+		jaComprado = true
+		Economia.carteiras[jogador.UserId] = carteira - preco
+
+		mostrar(originalItens)
+		ocultar(originalBotao)
+
+		-- avisa os botões de dentro que podem aparecer
+		botao:SetAttribute("Comprado", true)
+
+		print(jogador.Name .. " comprou por " .. preco)
+	else
+		print(jogador.Name .. " não tem dinheiro suficiente")
+	end
+end
+
 -- ========================================
 -- QUANDO O JOGO COMEÇA
 -- ========================================
@@ -242,32 +275,5 @@ if botaoPai then
 	verificarPai()
 end
 
--- ========================================
--- EVENTO: compra quando o dono toca no botão
--- ========================================
-botao.Touched:Connect(function(hit)
-	if jaComprado or not liberado then return end
-
-	local jogador = Players:GetPlayerFromCharacter(hit.Parent)
-	if not jogador then return end
-
-	-- só o dono da base compra
-	if not Economia.ehDono(tycoon, jogador) then return end
-
-	local carteira = Economia.carteiras[jogador.UserId] or 0
-
-	if carteira >= preco then
-		jaComprado = true
-		Economia.carteiras[jogador.UserId] = carteira - preco
-
-		mostrar(originalItens)
-		ocultar(originalBotao)
-
-		-- avisa os botões de dentro que podem aparecer
-		botao:SetAttribute("Comprado", true)
-
-		print(jogador.Name .. " comprou por " .. preco)
-	else
-		print(jogador.Name .. " não tem dinheiro suficiente")
-	end
-end)
+-- liga a compra ao toque no botão
+botao.Touched:Connect(tentarComprar)
