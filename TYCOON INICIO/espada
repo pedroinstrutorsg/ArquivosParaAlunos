@@ -1,0 +1,61 @@
+-- ========================================
+-- SCRIPT: ESPADA NOVA
+-- Ao clicar, a espada dá um golpe; a lâmina tira vida dos outros jogadores.
+-- Local: dentro da Tool EspadaNova
+-- ========================================
+
+local Players = game:GetService("Players")
+
+local ferramenta = script.Parent                     -- a ferramenta
+local modelo = ferramenta:WaitForChild("espada")     -- o modelo com as peças da espada
+
+-- CONFIGURAÇÕES
+local dano = 25              -- vida que cada golpe tira
+local tempoEntreGolpes = 0.6 -- segundos de espera entre um golpe e outro
+
+-- lista das partes que dão dano
+local lamina = {
+	modelo:WaitForChild("lamina"),
+	modelo:WaitForChild("ponta1"),
+	modelo:WaitForChild("ponta2"),
+}
+
+-- CONTROLE
+local atacando = false  -- se o golpe está acontecendo agora
+local atingidos = {}    -- quem já levou dano neste golpe
+
+-- golpe ao clicar
+ferramenta.Activated:Connect(function()
+	if atacando then return end
+	atacando = true
+	atingidos = {}
+
+	-- animação de golpe padrão do Roblox
+	local animacao = Instance.new("StringValue")
+	animacao.Name = "toolanim"
+	animacao.Value = "Slash"
+	animacao.Parent = ferramenta
+
+	task.wait(tempoEntreGolpes)
+	atacando = false
+end)
+
+-- dá dano quando a lâmina encosta em outro jogador
+local function toque(hit)
+	if not atacando then return end
+
+	local personagem = hit.Parent
+	local humanoid = personagem and personagem:FindFirstChildOfClass("Humanoid")
+	local atingido = Players:GetPlayerFromCharacter(personagem)       -- jogador que levou o golpe
+	local dono = Players:GetPlayerFromCharacter(ferramenta.Parent)    -- jogador que segura a espada
+
+	if humanoid and atingido and atingido ~= dono and not atingidos[humanoid] then
+		atingidos[humanoid] = true
+		humanoid:TakeDamage(dano)
+	end
+end
+
+-- liga o toque em cada parte da lâmina
+for _, parte in ipairs(lamina) do
+	parte.Touched:Connect(toque)
+end
