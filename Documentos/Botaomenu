@@ -1,0 +1,353 @@
+using System.Collections;
+using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+// Botão de menu configurado pelo Inspector
+[RequireComponent(typeof(Button))]
+public class BotaoMenu : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
+{
+    // Ações que o botão pode executar
+    public enum TipoAcao
+    {
+        IrParaCena,
+        ReiniciarFase,
+        SairDoJogo
+    }
+
+    // Animações que o botão faz sozinho
+    public enum TipoAnimacao
+    {
+        Nenhuma,
+        Flutuar,
+        Pulsar,
+        Balancar
+    }
+
+    [Header("Ação ao clicar")]
+    [Tooltip("O que acontece quando o botão é clicado")]
+    public TipoAcao acao = TipoAcao.IrParaCena;
+
+    [Tooltip("Arraste aqui a cena que o botão vai abrir (só para Ir Para Cena)")]
+    [SerializeField] private Object cena;
+
+    // Nome da cena arrastada
+    [SerializeField, HideInInspector] private string nomeCena;
+
+    [Tooltip("Tempo em segundos antes de executar a ação")]
+    public float esperaAntesDaAcao = 0.15f;
+
+    [Header("Animação parada")]
+    [Tooltip("Animação que o botão faz o tempo todo")]
+    public TipoAnimacao animacao = TipoAnimacao.Nenhuma;
+
+    [Tooltip("Velocidade da animação parada")]
+    public float velocidadeAnimacao = 2f;
+
+    [Tooltip("Altura em pixels da animação Flutuar")]
+    public float alturaFlutuar = 10f;
+
+    [Tooltip("Quanto o botão cresce na animação Pulsar (0.05 = 5%)")]
+    public float tamanhoPulso = 0.05f;
+
+    [Tooltip("Ângulo em graus da animação Balançar")]
+    public float anguloBalanco = 5f;
+
+    [Header("Mouse em cima")]
+    [Tooltip("Aumenta o botão quando o mouse passa por cima")]
+    public bool aumentarComMouse = true;
+
+    [Tooltip("Tamanho do botão com o mouse em cima (1.1 = 10% maior)")]
+    public float escalaComMouse = 1.1f;
+
+    [Tooltip("Muda a cor do texto quando o mouse passa por cima")]
+    public bool mudarCorDoTexto = false;
+
+    [Tooltip("Cor do texto com o mouse em cima")]
+    public Color corDoTextoComMouse = Color.yellow;
+
+    [Header("Clique")]
+    [Tooltip("Diminui o botão enquanto ele é pressionado")]
+    public bool encolherAoClicar = true;
+
+    [Tooltip("Tamanho do botão pressionado (0.9 = 10% menor)")]
+    public float escalaAoClicar = 0.9f;
+
+    [Tooltip("Velocidade da mudança de tamanho")]
+    public float velocidadeDoTamanho = 12f;
+
+    // Componente Button do objeto
+    private Button botao;
+
+    // RectTransform do botão
+    private RectTransform rect;
+
+    // Texto do botão
+    private TMP_Text texto;
+
+    // Valores originais do botão
+    private Vector3 escalaOriginal;
+    private Vector2 posicaoOriginal;
+    private Quaternion rotacaoOriginal;
+    private Color corOriginalDoTexto;
+
+    // Tamanho atual usado na transição
+    private float multiplicadorAtual = 1f;
+
+    // Diferença de tempo para os botões não se moverem juntos
+    private float defasagem;
+
+    // Estados do botão
+    private bool mouseEmCima;
+    private bool pressionado;
+    private bool executando;
+    private bool iniciado;
+
+    // Guarda as referências e os valores originais
+    private void Awake()
+    {
+        botao = GetComponent<Button>();
+        rect = GetComponent<RectTransform>();
+        texto = GetComponentInChildren<TMP_Text>();
+
+        escalaOriginal = transform.localScale;
+        rotacaoOriginal = transform.localRotation;
+
+        if (texto != null)
+        {
+            corOriginalDoTexto = texto.color;
+        }
+
+        defasagem = transform.GetSiblingIndex() * 0.7f;
+    }
+
+    // Guarda a posição depois que o Canvas organizou a tela
+    private void Start()
+    {
+        posicaoOriginal = rect.anchoredPosition;
+        iniciado = true;
+    }
+
+    // Liga o clique do botão
+    private void OnEnable()
+    {
+        GetComponent<Button>().onClick.AddListener(AoClicar);
+    }
+
+    // Desliga o clique e volta o botão ao normal
+    private void OnDisable()
+    {
+        GetComponent<Button>().onClick.RemoveListener(AoClicar);
+
+        mouseEmCima = false;
+        pressionado = false;
+        executando = false;
+        multiplicadorAtual = 1f;
+
+        if (iniciado)
+        {
+            transform.localScale = escalaOriginal;
+            transform.localRotation = rotacaoOriginal;
+
+            if (animacao == TipoAnimacao.Flutuar)
+            {
+                rect.anchoredPosition = posicaoOriginal;
+            }
+        }
+
+        if (texto != null)
+        {
+            texto.color = corOriginalDoTexto;
+        }
+    }
+
+    // Atualiza tamanho e animações a cada quadro
+    private void Update()
+    {
+        float alvo = 1f;
+
+        if (mouseEmCima && aumentarComMouse)
+        {
+            alvo *= escalaComMouse;
+        }
+
+        if (pressionado && encolherAoClicar)
+        {
+            alvo *= escalaAoClicar;
+        }
+
+        multiplicadorAtual = Mathf.Lerp(multiplicadorAtual, alvo, Time.unscaledDeltaTime * velocidadeDoTamanho);
+
+        float tempo = Time.unscaledTime * velocidadeAnimacao + defasagem;
+        float onda = Mathf.Sin(tempo);
+        float pulso = 1f;
+
+        if (animacao == TipoAnimacao.Pulsar)
+        {
+            pulso = 1f + onda * tamanhoPulso;
+        }
+
+        transform.localScale = escalaOriginal * multiplicadorAtual * pulso;
+
+        if (animacao == TipoAnimacao.Flutuar)
+        {
+            rect.anchoredPosition = posicaoOriginal + Vector2.up * onda * alturaFlutuar;
+        }
+
+        if (animacao == TipoAnimacao.Balancar)
+        {
+            transform.localRotation = rotacaoOriginal * Quaternion.Euler(0f, 0f, onda * anguloBalanco);
+        }
+    }
+
+    // Mouse entrou no botão
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (!botao.interactable)
+        {
+            return;
+        }
+
+        mouseEmCima = true;
+
+        if (mudarCorDoTexto && texto != null)
+        {
+            texto.color = corDoTextoComMouse;
+        }
+    }
+
+    // Mouse saiu do botão
+    public void OnPointerExit(PointerEventData eventData)
+    {
+        mouseEmCima = false;
+        pressionado = false;
+
+        if (texto != null)
+        {
+            texto.color = corOriginalDoTexto;
+        }
+    }
+
+    // Botão do mouse apertado
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        if (botao.interactable)
+        {
+            pressionado = true;
+        }
+    }
+
+    // Botão do mouse solto
+    public void OnPointerUp(PointerEventData eventData)
+    {
+        pressionado = false;
+    }
+
+    // Chamado quando o botão é clicado
+    public void AoClicar()
+    {
+        if (executando)
+        {
+            return;
+        }
+
+        StartCoroutine(ExecutarAcao());
+    }
+
+    // Espera um pouco e executa a ação escolhida
+    private IEnumerator ExecutarAcao()
+    {
+        executando = true;
+
+        if (esperaAntesDaAcao > 0f)
+        {
+            yield return new WaitForSecondsRealtime(esperaAntesDaAcao);
+        }
+
+        switch (acao)
+        {
+            case TipoAcao.IrParaCena:
+                CarregarCena(nomeCena);
+                break;
+
+            case TipoAcao.ReiniciarFase:
+                CarregarCena(SceneManager.GetActiveScene().name);
+                break;
+
+            case TipoAcao.SairDoJogo:
+                SairDoJogo();
+                break;
+        }
+
+        executando = false;
+    }
+
+    // Abre uma cena pelo nome
+    private void CarregarCena(string nome)
+    {
+        if (string.IsNullOrEmpty(nome))
+        {
+            Debug.LogWarning("O botão " + name + " não tem uma cena. Arraste a cena no campo Cena.");
+            return;
+        }
+
+        if (!Application.CanStreamedLevelBeLoaded(nome))
+        {
+            Debug.LogError("A cena " + nome + " não está na lista de cenas do Build.");
+            return;
+        }
+
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(nome);
+    }
+
+    // Fecha o jogo
+    private void SairDoJogo()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+#if UNITY_EDITOR
+    // Confere a cena arrastada no Inspector
+    private void OnValidate()
+    {
+        if (cena == null)
+        {
+            nomeCena = "";
+            return;
+        }
+
+        if (!(cena is UnityEditor.SceneAsset))
+        {
+            Debug.LogWarning("O campo Cena do botão " + name + " só aceita cenas.");
+            cena = null;
+            nomeCena = "";
+            return;
+        }
+
+        nomeCena = cena.name;
+
+        string caminho = UnityEditor.AssetDatabase.GetAssetPath(cena);
+        bool estaNaLista = false;
+
+        foreach (UnityEditor.EditorBuildSettingsScene item in UnityEditor.EditorBuildSettings.scenes)
+        {
+            if (item.path == caminho && item.enabled)
+            {
+                estaNaLista = true;
+            }
+        }
+
+        if (!estaNaLista)
+        {
+            Debug.LogWarning("A cena " + nomeCena + " ainda não está na lista de cenas do Build.");
+        }
+    }
+#endif
+}
