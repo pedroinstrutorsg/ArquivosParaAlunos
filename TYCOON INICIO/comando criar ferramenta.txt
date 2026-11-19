@@ -1,0 +1,265 @@
+-- ========================================
+-- COMANDO: CRIAR FERRAMENTA
+-- Transforma a pasta selecionada numa Tool pronta: solda tudo no Handle e coloca o script de ataque.
+-- Como usar: selecione a pasta no Explorer, cole na Command Bar e aperte Enter.
+-- ========================================
+
+local Selection = game:GetService("Selection")
+
+-- código do script que vai dentro da ferramenta
+local codigoDoScript = [==[
+-- ========================================
+-- SCRIPT: FERRAMENTA DE ATAQUE
+-- Ao clicar, a ferramenta dá um golpe; as partes escolhidas tiram vida dos outros jogadores.
+-- Local: dentro da Tool
+-- ========================================
+
+local Players = game:GetService("Players")
+local Debris = game:GetService("Debris")
+
+local ferramenta = script.Parent  -- a ferramenta
+
+-- CONFIGURAÇÕES
+local dano = 25              -- vida que cada golpe tira
+local velocidadeDeAtaque = 1.6 -- golpes por segundo (número maior = ataca mais rápido)
+local durabilidade = 30         -- quantos acertos a arma aguenta; em 0 ela quebra e some da mão
+local forcaDoEmpurrao = 30      -- força do empurrão em quem leva o golpe (0 = sem empurrão)
+local chanceDeCritico = 10      -- chance de golpe crítico, em porcentagem (0 a 100)
+local multiplicadorCritico = 2  -- quanto o golpe crítico multiplica o dano (2 = dobro)
+local partesQueDaoDano = {}  -- nomes das peças, unions ou models que dão dano (ex: {"Part", "Union"}); vazio = tudo menos o Handle
+local tamanho = 1            -- tamanho da ferramenta inteira (1 = normal, 2 = dobro, 0.5 = metade)
+local alturaNaMao = 0        -- sobe (número positivo) ou desce (número negativo) a ferramenta na mão, em studs
+local rotacaoX = 0           -- giro da ferramenta na mão no eixo X, em graus (inclina para a frente ou para trás)
+local rotacaoY = 0           -- giro da ferramenta na mão no eixo Y, em graus (vira de lado)
+local rotacaoZ = 0           -- giro da ferramenta na mão no eixo Z, em graus (deita para os lados)
+
+-- CONTROLE
+local atacando = false  -- se o golpe está acontecendo agora
+local atingidos = {}    -- quem já levou dano neste golpe
+
+-- muda o tamanho, a altura e a rotação da ferramenta (só uma vez; as cópias já vêm prontas)
+if not ferramenta:GetAttribute("Preparada") then
+	local handle = ferramenta:WaitForChild("Handle")
+	local centro = handle.CFrame
+
+	-- desliga as soldas para mexer nas peças
+	local soldas = {}
+	for _, objeto in ipairs(ferramenta:GetDescendants()) do
+		if objeto:IsA("WeldConstraint") and objeto.Enabled then
+			objeto.Enabled = false
+			table.insert(soldas, objeto)
+		end
+	end
+
+	-- aumenta ou diminui cada peça a partir do Handle
+	for _, peca in ipairs(ferramenta:GetDescendants()) do
+		if peca:IsA("BasePart") then
+			local posicao = centro:ToObjectSpace(peca.CFrame)
+			peca.Size = peca.Size * tamanho
+			peca.CFrame = centro * (posicao + posicao.Position * (tamanho - 1))
+		end
+	end
+
+	-- liga as soldas de novo
+	for _, solda in ipairs(soldas) do
+		solda.Enabled = true
+	end
+
+	-- pegada: onde a mão segura, rotação e altura
+	ferramenta.Grip = CFrame.new(ferramenta.Grip.Position * tamanho)
+		* CFrame.Angles(math.rad(rotacaoX), math.rad(rotacaoY), math.rad(rotacaoZ))
+		* CFrame.new(0, -alturaNaMao, 0)
+
+	ferramenta:SetAttribute("Preparada", true)
+end
+
+-- diz se a peça está na lista de partes que dão dano
+local function daDano(peca)
+	if #partesQueDaoDano == 0 then
+		return peca.Name ~= "Handle"
+	end
+	for _, nome in ipairs(partesQueDaoDano) do
+		local atual = peca
+		while atual and atual ~= ferramenta do
+			if atual.Name == nome then
+				return true
+			end
+			atual = atual.Parent
+		end
+	end
+	return false
+end
+
+-- solta as peças quando o jogador segura a ferramenta
+ferramenta.Equipped:Connect(function()
+	for _, peca in ipairs(ferramenta:GetDescendants()) do
+		if peca:IsA("BasePart") then
+			peca.Anchored = false
+		end
+	end
+end)
+
+-- mostra a durabilidade ao passar o mouse na arma
+ferramenta.ToolTip = "Durabilidade: " .. durabilidade
+
+-- golpe ao clicar
+ferramenta.Activated:Connect(function()
+	if atacando then return end
+	atacando = true
+	atingidos = {}
+
+	-- animação de golpe padrão do Roblox
+	local animacao = Instance.new("StringValue")
+	animacao.Name = "toolanim"
+	animacao.Value = "Slash"
+	animacao.Parent = ferramenta
+
+	task.wait(1 / velocidadeDeAtaque)
+	atacando = false
+end)
+
+-- empurra o jogador atingido para longe de quem bateu
+local function empurrar(personagem)
+	if forcaDoEmpurrao <= 0 then return end
+
+	local raiz = personagem:FindFirstChild("HumanoidRootPart")
+	local minhaRaiz = ferramenta.Parent:FindFirstChild("HumanoidRootPart")
+	if not raiz or not minhaRaiz then return end
+
+	local direcao = (raiz.Position - minhaRaiz.Position) * Vector3.new(1, 0, 1)
+	if direcao.Magnitude < 0.01 then return end
+
+	local anexo = Instance.new("Attachment")
+	anexo.Parent = raiz
+
+	local empurrao = Instance.new("LinearVelocity")
+	empurrao.Attachment0 = anexo
+	empurrao.MaxForce = math.huge
+	empurrao.VectorVelocity = direcao.Unit * forcaDoEmpurrao + Vector3.new(0, forcaDoEmpurrao * 0.4, 0)
+	empurrao.Parent = raiz
+
+	Debris:AddItem(empurrao, 0.2)
+	Debris:AddItem(anexo, 0.2)
+end
+
+-- dá dano quando uma parte de dano encosta em outro jogador
+local function toque(hit)
+	if not atacando then return end
+
+	local personagem = hit.Parent
+	local humanoid = personagem and personagem:FindFirstChildOfClass("Humanoid")
+	local atingido = Players:GetPlayerFromCharacter(personagem)       -- jogador que levou o golpe
+	local dono = Players:GetPlayerFromCharacter(ferramenta.Parent)    -- jogador que segura a ferramenta
+
+	if humanoid and atingido and atingido ~= dono and not atingidos[humanoid] then
+		atingidos[humanoid] = true
+		-- golpe crítico: às vezes o dano é multiplicado
+		local danoDoGolpe = dano
+		if math.random(1, 100) <= chanceDeCritico then
+			danoDoGolpe = dano * multiplicadorCritico
+		end
+
+		humanoid:TakeDamage(danoDoGolpe)
+		empurrar(personagem)
+
+		-- gasta a durabilidade; em 0 a arma quebra
+		durabilidade = durabilidade - 1
+		ferramenta.ToolTip = "Durabilidade: " .. durabilidade
+		if durabilidade <= 0 then
+			ferramenta:Destroy()
+		end
+	end
+end
+
+-- liga o toque em cada parte de dano
+for _, peca in ipairs(ferramenta:GetDescendants()) do
+	if peca:IsA("BasePart") and daDano(peca) then
+		peca.Touched:Connect(toque)
+	end
+end
+]==]
+
+-- a pasta selecionada
+local pasta = Selection:Get()[1]
+if not pasta then
+	warn("Selecione a pasta da ferramenta no Explorer antes de rodar o comando.")
+	return
+end
+
+-- acha o Handle em qualquer lugar da pasta
+local handle = pasta:FindFirstChild("Handle", true)
+if not handle or not handle:IsA("BasePart") then
+	warn("A pasta " .. pasta.Name .. " precisa ter uma peça chamada Handle.")
+	return
+end
+
+-- usa a Tool que já existe na pasta ou cria uma nova
+local ferramenta = pasta:FindFirstChildOfClass("Tool")
+if not ferramenta then
+	ferramenta = Instance.new("Tool")
+	ferramenta.Name = pasta.Name
+	ferramenta.CanBeDropped = false
+	ferramenta.Grip = CFrame.new()
+	ferramenta.Parent = pasta
+end
+
+-- coloca tudo da pasta dentro da Tool e o Handle direto nela
+for _, objeto in ipairs(pasta:GetChildren()) do
+	if objeto ~= ferramenta then
+		objeto.Parent = ferramenta
+	end
+end
+handle.Parent = ferramenta
+
+-- diz se a peça já está soldada no Handle
+local function jaSoldada(peca)
+	for _, objeto in ipairs(peca:GetChildren()) do
+		if objeto:IsA("WeldConstraint") and objeto.Part0 == handle and objeto.Part1 == peca then
+			return true
+		end
+	end
+	return false
+end
+
+-- apaga soldas vazias e solda cada peça no Handle
+local nomes = {}
+for _, objeto in ipairs(ferramenta:GetDescendants()) do
+	if objeto:IsA("WeldConstraint") and (objeto.Part0 == nil or objeto.Part1 == nil) then
+		objeto:Destroy()
+	end
+end
+for _, peca in ipairs(ferramenta:GetDescendants()) do
+	if peca:IsA("BasePart") then
+		peca.CanCollide = false
+		if peca ~= handle then
+			peca.Massless = true
+			if not jaSoldada(peca) then
+				local solda = Instance.new("WeldConstraint")
+				solda.Part0 = handle
+				solda.Part1 = peca
+				solda.Parent = peca
+			end
+			nomes[peca.Name] = (nomes[peca.Name] or 0) + 1
+		end
+	end
+end
+
+-- coloca o script de ataque (se ainda não tiver)
+if not ferramenta:FindFirstChild("ScriptAtaque") then
+	local script = Instance.new("Script")
+	script.Name = "ScriptAtaque"
+	script.Source = codigoDoScript
+	script.Parent = ferramenta
+end
+
+-- mostra os nomes das peças para usar na lista partesQueDaoDano
+print("Ferramenta " .. ferramenta.Name .. " pronta! Peças que podem dar dano:")
+for nome, quantidade in pairs(nomes) do
+	print("   " .. nome .. (quantidade > 1 and (" (" .. quantidade .. " peças com esse nome)") or ""))
+end
+for _, objeto in ipairs(ferramenta:GetDescendants()) do
+	if (objeto:IsA("Model") or objeto:IsA("Folder")) and objeto:FindFirstChildWhichIsA("BasePart", true) then
+		print("   " .. objeto.Name .. " (grupo: todas as peças de dentro)")
+	end
+end
+Selection:Set({ ferramenta })
